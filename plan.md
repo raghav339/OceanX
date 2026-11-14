@@ -37,7 +37,7 @@
 
 ---
 
-#### 1.2 Persistent User Preferences (localStorage)
+#### 1.2 Persistent User Preferences (localStorage) (Completed ✅)
 **Problem:** Every page reload resets the selected region, parameter, palette, language, and depth.
 **Plan:**
 - Serialize key state (`selectedParam`, `depth`, `palette`, `activeRegion.id`, `i18n.language`, `simSpeed`) to `localStorage` on change.

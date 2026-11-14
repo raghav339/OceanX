@@ -27,23 +27,36 @@ import OceanCopilot from './components/ai/OceanCopilot';
 import { REGIONS, createLocationData } from './data/oceanData';
 import { getFormattedCurrentDate, getCurrentUtcTimeHour } from './utils/dateUtils';
 import { getAccurateMeteorology } from './utils/weatherService';
+import { useTranslation } from 'react-i18next';
+import { SUPPORTED_LANGUAGES } from './i18n/languages';
+import { usePersistedState, getPersistedValue, setPersistedValue } from './hooks/usePersistedState';
 
 export default function App() {
-  // Default to clean modern scroll-driven story experience
+  const { i18n } = useTranslation();
+
+  // Phase 1.2: Persistent User Preferences (localStorage) with safe defaults and validation
   const [activeTab, setActiveTab] = useState('Story View');
-  const [selectedParam, setSelectedParam] = useState('sst');
-  const [depth, setDepth] = useState(50);
+  const [selectedParam, setSelectedParam] = usePersistedState('oceanx_pref_param', 'sst', {
+    validator: (v) => typeof v === 'string' && ['sst', 'salinity', 'currents', 'wave', 'chlorophyll', 'oxygen'].includes(v)
+  });
+  const [depth, setDepth] = usePersistedState('oceanx_pref_depth', 50, {
+    validator: (v) => typeof v === 'number' && !isNaN(v) && v >= 0 && v <= 6000
+  });
   const [viewMode, setViewMode] = useState('depth_slice');
   const [timeHour, setTimeHour] = useState(() => getCurrentUtcTimeHour());
   const [isPlaying, setIsPlaying] = useState(true);
-  const [simSpeed, setSimSpeed] = useState(1);
+  const [simSpeed, setSimSpeed] = usePersistedState('oceanx_pref_sim_speed', 1, {
+    validator: (v) => typeof v === 'number' && !isNaN(v) && v > 0 && v <= 10
+  });
   const [selectedBuoy, setSelectedBuoy] = useState(null);
   const [copilotExternalPrompt, setCopilotExternalPrompt] = useState(null);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [isControlsDrawerOpen, setIsControlsDrawerOpen] = useState(false);
 
   // Dynamic Colorbar, Palette, Layer Opacity & 3D Vertical Exaggeration State
-  const [palette, setPalette] = useState('turbo');
+  const [palette, setPalette] = usePersistedState('oceanx_pref_palette', 'turbo', {
+    validator: (v) => typeof v === 'string' && v.trim().length > 0
+  });
   const [layerOpacity, setLayerOpacity] = useState(0.95);
   const [verticalExaggeration, setVerticalExaggeration] = useState(1.0);
   const [isLogScale, setIsLogScale] = useState(false);
@@ -56,13 +69,56 @@ export default function App() {
     isPlaying: true
   });
 
-  // Dynamic Location & Meteorological Threat State (Initializes to actual current date)
+  // Dynamic Location & Meteorological Threat State (Initializes from persisted preference or default)
   const [selectedDate, setSelectedDate] = useState(() => getFormattedCurrentDate());
-  const [activeRegion, setActiveRegion] = useState(() => ({
-    ...REGIONS.bay_of_bengal,
-    date: getFormattedCurrentDate()
-  }));
+  const [activeRegion, setActiveRegion] = useState(() => {
+    const saved = getPersistedValue('oceanx_pref_region', 'bay_of_bengal');
+    const currentDate = getFormattedCurrentDate();
+    if (typeof saved === 'string' && REGIONS[saved]) {
+      return {
+        ...REGIONS[saved],
+        date: currentDate
+      };
+    }
+    if (typeof saved === 'object' && saved !== null && typeof saved.lat === 'number' && typeof saved.lon === 'number') {
+      return createLocationData(saved.lat, saved.lon, saved.name, currentDate);
+    }
+    return {
+      ...REGIONS.bay_of_bengal,
+      date: currentDate
+    };
+  });
   const [isStormLayerActive, setIsStormLayerActive] = useState(false);
+
+  // Phase 1.2: Serialize activeRegion to localStorage on change
+  useEffect(() => {
+    if (!activeRegion) return;
+    if (activeRegion.id && REGIONS[activeRegion.id]) {
+      setPersistedValue('oceanx_pref_region', activeRegion.id);
+    } else if (typeof activeRegion.lat === 'number' && typeof activeRegion.lon === 'number') {
+      setPersistedValue('oceanx_pref_region', {
+        id: activeRegion.id || 'custom',
+        lat: activeRegion.lat,
+        lon: activeRegion.lon,
+        name: activeRegion.name || 'Custom Location'
+      });
+    }
+  }, [activeRegion?.id, activeRegion?.lat, activeRegion?.lon, activeRegion?.name]);
+
+  // Phase 1.2: Rehydrate and synchronize i18n language preference
+  useEffect(() => {
+    try {
+      const savedLang = getPersistedValue('oceanx_pref_language', null) || getPersistedValue('ocenova-language', null);
+      if (savedLang && i18n && i18n.language !== savedLang && SUPPORTED_LANGUAGES.some((l) => l.code === savedLang)) {
+        i18n.changeLanguage(savedLang);
+      }
+    } catch (_) {}
+  }, [i18n]);
+
+  useEffect(() => {
+    if (!i18n?.language) return;
+    setPersistedValue('oceanx_pref_language', i18n.language);
+  }, [i18n?.language]);
 
   // Modals
   const [isAnomalyModalOpen, setIsAnomalyModalOpen] = useState(false);
@@ -88,9 +144,11 @@ export default function App() {
   }, [isPlaying, simSpeed]);
 
   // Phase 1.1: Real-Time Data Refresh & Telemetry Polling State
-  // Configurable polling interval: 30s / 60s / 300s (5 min)
-  const [refreshInterval, setRefreshInterval] = useState(60);
-  const [refreshCountdown, setRefreshCountdown] = useState(60);
+  // Configurable polling interval: 30s / 60s / 300s (5 min) - persisted across reloads
+  const [refreshInterval, setRefreshInterval] = usePersistedState('oceanx_pref_refresh_interval', 60, {
+    validator: (v) => typeof v === 'number' && [30, 60, 300].includes(v)
+  });
+  const [refreshCountdown, setRefreshCountdown] = useState(refreshInterval);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState(() => new Date());
 

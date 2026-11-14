@@ -1,4 +1,4 @@
-import { getAccurateMeteorology, fetchLiveMarineWeather, calculateScientificWeather } from '../src/utils/weatherService.js';
+import { getAccurateMeteorology, calculateScientificWeather } from '../src/utils/weatherService.js';
 import { REGIONS, calculateParameterAtDepth } from '../src/data/oceanData.js';
 
 async function runTests() {
