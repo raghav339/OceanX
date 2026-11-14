@@ -4,6 +4,168 @@ import { Camera, Check } from 'lucide-react';
 import { generateEarthTopographyTexture, generateBathymetryTexture } from './proceduralTextures';
 import { OceanSurfaceShader, DepthWallShader } from './OceanShaders';
 
+// ---------------------------------------------------------------------------
+// VECTOR FIELD HELPERS
+// ---------------------------------------------------------------------------
+
+/**
+ * Cheap, stable, region-seeded pseudo-random number generator.
+ * Produces a deterministic float in [0, 1) from a string seed + index.
+ */
+function seededRand(seed, idx) {
+  let h = idx * 2654435761;
+  for (let i = 0; i < seed.length; i++) {
+    h = Math.imul(h ^ seed.charCodeAt(i), 2246822519);
+  }
+  h = Math.imul(h ^ (h >>> 16), 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 3266489917);
+  h = h ^ (h >>> 16);
+  return (h >>> 0) / 0xffffffff;
+}
+
+/**
+ * Derive a smooth, plausible ocean-current direction field on a 12×10 grid.
+ * Direction is a base gyre angle (seeded by region.id) plus a spatially-
+ * varying perturbation so arrows form convincing swirling structures.
+ *
+ * Returns array of { x, z, angle, speed } objects.
+ */
+function deriveVectorField(region) {
+  const cols = 12;
+  const rows = 10;
+  const oceanWidth = 3.6;
+  const oceanDepth = 3.2;
+  const baseSpeed = Math.min(2.2, Math.max(0.1, region?.currentSpeed ?? 0.85));
+  const seed = region?.id ?? 'default';
+
+  // Base gyre direction – stable per-region (radians)
+  const gyreAngle = seededRand(seed, 0) * Math.PI * 2;
+  // Gyre centre offset – stable per-region
+  const gyreCx = (seededRand(seed, 1) - 0.5) * oceanWidth * 0.5;
+  const gyreCz = (seededRand(seed, 2) - 0.5) * oceanDepth * 0.5;
+
+  const arrows = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = -oceanWidth * 0.45 + col * (oceanWidth * 0.9 / (cols - 1));
+      const z = -oceanDepth * 0.44 + row * (oceanDepth * 0.88 / (rows - 1));
+
+      // Distance from gyre centre → speed falls off towards edges
+      const dx = x - gyreCx;
+      const dz = z - gyreCz;
+      const dist = Math.sqrt(dx * dx + dz * dz) + 0.3;
+
+      // Tangential direction around gyre centre
+      const tangAngle = Math.atan2(dx, dz) + gyreAngle;
+
+      // Small local perturbation seeded per cell
+      const cellSeed = row * cols + col;
+      const perturb = (seededRand(seed, cellSeed + 10) - 0.5) * 0.9;
+
+      const angle = tangAngle + perturb;
+      // Speed: strongest near gyre centre, fades outward, clamped
+      const speedNorm = Math.min(1, (1.4 / (dist + 0.6)) + seededRand(seed, cellSeed + 200) * 0.15);
+      const speed = baseSpeed * speedNorm;
+
+      arrows.push({ x, z, angle, speed });
+    }
+  }
+  return arrows;
+}
+
+/**
+ * Map a normalised [0,1] speed value to a THREE.Color using the active palette.
+ */
+function speedToColor(t, paletteId) {
+  t = Math.max(0, Math.min(1, t));
+  switch (paletteId) {
+    case 'viridis': {
+      const r = 0.267 + t * (0.993 - 0.267);
+      const g = 0.005 + t * (0.906 - 0.005);
+      const b = 0.329 + (1 - t) * (0.329);
+      return new THREE.Color(r, Math.max(0, g - t * 0.3), Math.max(0, b));
+    }
+    case 'thermal': {
+      return new THREE.Color(t, 0.3 * (1 - t), 1 - t);
+    }
+    case 'coolwarm': {
+      return t < 0.5
+        ? new THREE.Color(0.17 + t * 0.66, 0.51, 0.73 - t * 0.26)
+        : new THREE.Color(0.70 + (t - 0.5) * 0.59, 0.09 - (t - 0.5) * 0.09, 0.09 - (t - 0.5) * 0.09);
+    }
+    case 'jet': {
+      const r = Math.min(1, Math.max(0, 1.5 - Math.abs(4 * t - 3)));
+      const g = Math.min(1, Math.max(0, 1.5 - Math.abs(4 * t - 2)));
+      const b = Math.min(1, Math.max(0, 1.5 - Math.abs(4 * t - 1)));
+      return new THREE.Color(r, g, b);
+    }
+    case 'turbo':
+    default: {
+      // Approximate turbo: deep blue → cyan → green → yellow → red
+      const r = Math.min(1, Math.max(0, 0.1 + t * 1.8 - Math.pow(t, 2) * 1.5));
+      const g = Math.min(1, Math.max(0, 0.9 * Math.sin(t * Math.PI)));
+      const b = Math.min(1, Math.max(0, 1 - t * 2.0));
+      return new THREE.Color(r, g, b);
+    }
+  }
+}
+
+/**
+ * Build an InstancedMesh of arrow cones for the vector field.
+ * Returns { mesh, geometry, material } for later disposal.
+ */
+function buildVectorArrows(region, paletteId) {
+  const arrows = deriveVectorField(region);
+  const count = arrows.length;
+
+  // Slim cone: tip points +Y. radiusBottom=0 gives a sharp tip.
+  const geo = new THREE.ConeGeometry(0.028, 0.14, 7, 1);
+  // Pivot: shift geometry so the base (not centre) sits at origin → arrow grows upward from surface
+  geo.translate(0, 0.07, 0);
+
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    roughness: 0.4,
+    metalness: 0.3,
+    transparent: true,
+    opacity: 0.92,
+  });
+
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+  // Per-instance colour buffer
+  const colors = new Float32Array(count * 3);
+
+  const maxSpeed = Math.min(2.2, Math.max(0.1, (region?.currentSpeed ?? 0.85) * 1.6));
+  const dummy = new THREE.Object3D();
+
+  arrows.forEach(({ x, z, angle, speed }, i) => {
+    // Position: just above ocean surface (y = 0.08)
+    dummy.position.set(x, 0.08, z);
+    // The cone tip is +Y; rotate around Y to face the flow direction (XZ plane),
+    // then tilt slightly forward so it's readable from the top camera angle.
+    dummy.rotation.set(0, -angle, 0);
+    // Scale: length proportional to speed
+    const s = 0.4 + (speed / maxSpeed) * 1.0;
+    dummy.scale.set(s, s, s);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+
+    const t = speed / maxSpeed;
+    const col = speedToColor(t, paletteId);
+    colors[i * 3 + 0] = col.r;
+    colors[i * 3 + 1] = col.g;
+    colors[i * 3 + 2] = col.b;
+  });
+
+  geo.setAttribute('color', new THREE.InstancedBufferAttribute(colors, 3));
+  mesh.instanceMatrix.needsUpdate = true;
+
+  return { mesh, geometry: geo, material: mat };
+}
+
+// ---------------------------------------------------------------------------
 // Helper to create text sprite for 3D depth ticks (0m, 100m, 500m, etc.)
 function createDepthLabelSprite(text) {
   const canvas = document.createElement('canvas');
@@ -284,6 +446,11 @@ const OceanCanvas = forwardRef(function OceanCanvas({
   const uniformsRef = useRef({});
   const depthWallUniformsRef = useRef({});
   const depthCutawayGroupRef = useRef(null);
+  const volumeGroupRef = useRef(null);
+  const isoGroupRef = useRef(null);
+  const vectorGroupRef = useRef(null);
+  const vectorArrowsRef = useRef(null); // { mesh, geometry, material } for the current arrow InstancedMesh
+  const paletteRef = useRef(palette);   // kept in sync below so render-loop & activeRegion effect see current palette
   const particlesRef = useRef(null);
   const buoysGroupRef = useRef(null);
   const earthMeshRef = useRef(null);
@@ -596,6 +763,36 @@ const OceanCanvas = forwardRef(function OceanCanvas({
     const seabedMesh = new THREE.Mesh(seabedGeo, seabedMat);
     seabedMesh.position.set(0, -depthSliceHeight, 0.15);
     depthCutawayGroup.add(seabedMesh);
+
+    // ---------------------------------------------------------------------------
+    // PLACEHOLDER GROUPS for future Volume, Isosurface, and Vector Field modes
+    // These are empty now; later steps will populate them when their modes are active.
+    // ---------------------------------------------------------------------------
+    const volumeGroup = new THREE.Group();
+    volumeGroup.visible = false;
+    scene.add(volumeGroup);
+    volumeGroupRef.current = volumeGroup;
+
+    const isoGroup = new THREE.Group();
+    isoGroup.visible = false;
+    scene.add(isoGroup);
+    isoGroupRef.current = isoGroup;
+
+    const vectorGroup = new THREE.Group();
+    vectorGroup.visible = false;
+    scene.add(vectorGroup);
+    vectorGroupRef.current = vectorGroup;
+
+    // Build the initial arrow InstancedMesh using the region passed at mount time.
+    // (The activeRegion effect will rebuild it whenever the region changes.)
+    {
+      const arrowData = buildVectorArrows(
+        propsRef.current.activeRegion,
+        paletteRef.current
+      );
+      vectorGroup.add(arrowData.mesh);
+      vectorArrowsRef.current = arrowData;
+    }
 
     // ---------------------------------------------------------------------------
     // 3D STORM, HURRICANE & TORNADO/WATERSPOUT ENGINE
@@ -925,6 +1122,12 @@ const OceanCanvas = forwardRef(function OceanCanvas({
         }
       });
 
+      // Vector field: gentle vertical pulse so arrows feel alive
+      if (vectorArrowsRef.current?.mesh && vectorGroupRef.current?.visible) {
+        const pulse = 1.0 + Math.sin(elapsed * 1.4) * 0.055;
+        vectorArrowsRef.current.mesh.scale.y = pulse;
+      }
+
       renderer.render(scene, camera);
     };
     animate();
@@ -948,6 +1151,16 @@ const OceanCanvas = forwardRef(function OceanCanvas({
       dom.removeEventListener('click', onClick);
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
+      // Clear placeholder groups so their contents (if any) are released
+      if (volumeGroupRef.current) { volumeGroupRef.current.clear(); }
+      if (isoGroupRef.current)    { isoGroupRef.current.clear(); }
+      if (vectorGroupRef.current) { vectorGroupRef.current.clear(); }
+      // Dispose vector arrow resources explicitly
+      if (vectorArrowsRef.current) {
+        vectorArrowsRef.current.geometry.dispose();
+        vectorArrowsRef.current.material.dispose();
+        vectorArrowsRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -964,6 +1177,28 @@ const OceanCanvas = forwardRef(function OceanCanvas({
       group.add(buoyObj);
     });
   }, [activeRegion]);
+
+  // Rebuild vector field arrows whenever activeRegion or palette changes.
+  // paletteRef is kept in sync so the render loop always sees the current palette.
+  useEffect(() => {
+    paletteRef.current = palette;
+    if (!vectorGroupRef.current) return;
+
+    const group = vectorGroupRef.current;
+
+    // Dispose old arrows
+    if (vectorArrowsRef.current) {
+      vectorArrowsRef.current.geometry.dispose();
+      vectorArrowsRef.current.material.dispose();
+      group.clear();
+      vectorArrowsRef.current = null;
+    }
+
+    // Build fresh arrows for new region/palette
+    const arrowData = buildVectorArrows(activeRegion, palette);
+    group.add(arrowData.mesh);
+    vectorArrowsRef.current = arrowData;
+  }, [activeRegion, palette]);
 
   // Update Region and Earth Globe rotation & dynamic wave swell when activeRegion changes
   useEffect(() => {
@@ -990,6 +1225,28 @@ const OceanCanvas = forwardRef(function OceanCanvas({
     const modeIndices = { surface: 0, depth_slice: 1, volume: 2, volume_render: 2, isosurface: 3, iso_surface: 3, vector_field: 4 };
     if (uniformsRef.current.uMode) uniformsRef.current.uMode.value = modeIndices[viewMode] ?? 1;
   }, [selectedParam, depth, viewMode]);
+
+  // Toggle scene-graph group visibility based on viewMode.
+  // This runs independently so it never re-triggers the heavy setup effect.
+  useEffect(() => {
+    // depthCutawayGroup: shown for depth_slice, volume, isosurface, vector_field.
+    // Hidden only for 'surface' (pure 2-D heatmap plane look).
+    if (depthCutawayGroupRef.current) {
+      depthCutawayGroupRef.current.visible = (viewMode !== 'surface');
+    }
+
+    // Placeholder groups – each is visible only in its own mode.
+    // Later steps will fill these groups; for now they remain empty.
+    if (volumeGroupRef.current) {
+      volumeGroupRef.current.visible = (viewMode === 'volume' || viewMode === 'volume_render');
+    }
+    if (isoGroupRef.current) {
+      isoGroupRef.current.visible = (viewMode === 'isosurface' || viewMode === 'iso_surface');
+    }
+    if (vectorGroupRef.current) {
+      vectorGroupRef.current.visible = (viewMode === 'vector_field');
+    }
+  }, [viewMode]);
 
   // Synchronize Color Palette, Layer Opacity, Vertical Exaggeration & Scale Mode
   useEffect(() => {
