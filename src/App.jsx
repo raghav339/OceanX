@@ -23,6 +23,7 @@ import EnsoSimulationDock from './components/ui/EnsoSimulationDock';
 import EnsoSimulationView from './components/ui/EnsoSimulationView';
 import ColorbarSettingsModal from './components/ui/ColorbarSettingsModal';
 import NetcdfIngestionModal from './components/ui/NetcdfIngestionModal';
+import KeyboardHelp from './components/ui/KeyboardHelp';
 import OceanCopilot from './components/ai/OceanCopilot';
 import { REGIONS, createLocationData } from './data/oceanData';
 import { getFormattedCurrentDate, getCurrentUtcTimeHour } from './utils/dateUtils';
@@ -203,6 +204,114 @@ export default function App() {
   const [isDepthPressureOpen, setIsDepthPressureOpen] = useState(false);
   const [isColorbarSettingsOpen, setIsColorbarSettingsOpen] = useState(false);
   const [isNetcdfIngestionOpen, setIsNetcdfIngestionOpen] = useState(false);
+  const [isKeyboardHelpOpen, setIsKeyboardHelpOpen] = useState(false);
+
+  // Phase 1.4: Global Keyboard Shortcuts & Accessibility Handler
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      // Ignore keystrokes when typing into interactive inputs
+      const target = e.target;
+      const tag = target?.tagName?.toLowerCase();
+      if (
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        target?.isContentEditable ||
+        target?.getAttribute?.('role') === 'textbox'
+      ) {
+        return;
+      }
+
+      // 1. Esc: Close any active modal, drawer, or help overlay
+      if (e.key === 'Escape') {
+        if (isKeyboardHelpOpen) setIsKeyboardHelpOpen(false);
+        else if (isLocationModalOpen) setIsLocationModalOpen(false);
+        else if (isDatePickerModalOpen) setIsDatePickerModalOpen(false);
+        else if (isStormNewsModalOpen) setIsStormNewsModalOpen(false);
+        else if (isAnomalyModalOpen) setIsAnomalyModalOpen(false);
+        else if (isFleetModalOpen) setIsFleetModalOpen(false);
+        else if (selectedBuoy) setSelectedBuoy(null);
+        else if (isAnalyticReportOpen) setIsAnalyticReportOpen(false);
+        else if (isDepthPressureOpen) setIsDepthPressureOpen(false);
+        else if (isColorbarSettingsOpen) setIsColorbarSettingsOpen(false);
+        else if (isNetcdfIngestionOpen) setIsNetcdfIngestionOpen(false);
+        else if (isControlsDrawerOpen) setIsControlsDrawerOpen(false);
+        else if (isCopilotOpen) setIsCopilotOpen(false);
+        return;
+      }
+
+      // 2. ?: Toggle Keyboard Help Overlay
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+        e.preventDefault();
+        setIsKeyboardHelpOpen((prev) => !prev);
+        return;
+      }
+
+      // Check if any modal is open before processing view/control shortcuts
+      const isAnyModalOpen = isKeyboardHelpOpen || isAnomalyModalOpen || isFleetModalOpen ||
+        isLocationModalOpen || isDatePickerModalOpen || isStormNewsModalOpen ||
+        isAnalyticReportOpen || isDepthPressureOpen || isColorbarSettingsOpen ||
+        isNetcdfIngestionOpen || selectedBuoy !== null || isControlsDrawerOpen;
+
+      if (isAnyModalOpen) return;
+
+      // 3. Space: Play / Pause simulation timeline
+      if (e.code === 'Space' || e.key === ' ') {
+        e.preventDefault();
+        setIsPlaying((prev) => !prev);
+        return;
+      }
+
+      // 4. Numbers 1 – 6: Switch active parameter
+      const paramMap = {
+        '1': 'sst',
+        '2': 'salinity',
+        '3': 'currents',
+        '4': 'wave',
+        '5': 'chlorophyll',
+        '6': 'oxygen'
+      };
+      if (paramMap[e.key]) {
+        e.preventDefault();
+        setSelectedParam(paramMap[e.key]);
+        return;
+      }
+
+      // 5. Arrow Up / Down: Adjust depth by ±50 m
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setDepth((prev) => Math.max(0, prev - 50));
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setDepth((prev) => Math.min(2000, prev + 50));
+        return;
+      }
+
+      // 6. C: Toggle AI Ocean Copilot
+      if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        setIsCopilotOpen((prev) => !prev);
+        return;
+      }
+
+      // 7. M: Toggle World Map / 3D Workstation
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        setActiveTab((prev) => (prev === 'Map View' ? '3D View' : 'Map View'));
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [
+    isKeyboardHelpOpen, isAnomalyModalOpen, isFleetModalOpen, isLocationModalOpen,
+    isDatePickerModalOpen, isStormNewsModalOpen, isAnalyticReportOpen, isDepthPressureOpen,
+    isColorbarSettingsOpen, isNetcdfIngestionOpen, selectedBuoy, isControlsDrawerOpen,
+    isCopilotOpen, setSelectedParam, setDepth
+  ]);
 
   // Real-time animation timeline ticker
   useEffect(() => {
@@ -370,6 +479,7 @@ export default function App() {
         onOpenNetcdfIngestion={() => setIsNetcdfIngestionOpen(true)}
         onOpenCopilot={() => setIsCopilotOpen(true)}
         onOpenControls={() => setIsControlsDrawerOpen(true)}
+        onOpenKeyboardHelp={() => setIsKeyboardHelpOpen(true)}
       />
 
       {/* 2. Main Central Workstation or Views */}
@@ -704,6 +814,12 @@ export default function App() {
             name: `${prev.name.split(' (')[0]} (${dataset.format})`
           }));
         }}
+      />
+
+      {/* Phase 1.4: Accessible Keyboard Navigation Guide */}
+      <KeyboardHelp
+        isOpen={isKeyboardHelpOpen}
+        onClose={() => setIsKeyboardHelpOpen(false)}
       />
 
       {/* 6. AI Ocean Copilot Floating Intelligence Dock & Drawer */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   X, 
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { MARINE_NEWS_BULLETINS } from '../../data/oceanData';
 import { getNearestBeaches, calculateBeachRainForecast } from '../../data/beachData';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 export default function StormNewsModal({ 
   isOpen, 
@@ -21,6 +22,9 @@ export default function StormNewsModal({
 }) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('beaches'); // 'beaches' or 'news'
+  const modalRef = useRef(null);
+
+  useFocusTrap(isOpen, modalRef, onClose);
 
   if (!isOpen) return null;
 
@@ -43,11 +47,18 @@ export default function StormNewsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 md:p-6 select-none animate-in fade-in duration-200">
-      <div className="glass-panel glow-border-red rounded-3xl p-6 border border-red-500/50 shadow-glow-red max-w-3xl w-full relative max-h-[92vh] flex flex-col bg-gradient-to-b from-[#1a0818] via-[#0b142d] to-[#040b1e]">
+      <div 
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('stormNews.title', 'Meteorological Warning & Coastal Threat Intelligence')}
+        className="glass-panel glow-border-red rounded-3xl p-6 border border-red-500/50 shadow-glow-red max-w-3xl w-full relative max-h-[92vh] flex flex-col bg-gradient-to-b from-[#1a0818] via-[#0b142d] to-[#040b1e]"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 text-red-300 hover:text-white hover:bg-red-500/25 transition-colors"
+          aria-label={t('common.close', 'Close dialog')}
+          className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 text-red-300 hover:text-white hover:bg-red-500/25 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>

@@ -19,7 +19,8 @@ import {
   AlertTriangle,
   Zap,
   ShieldAlert,
-  Radio
+  Radio,
+  Keyboard
 } from 'lucide-react';
 import LanguageSelector from './LanguageSelector';
 import { getFormattedCurrentDate } from '../../utils/dateUtils';
@@ -39,7 +40,8 @@ export default function Header({
   onOpenDepthPressure,
   onOpenNetcdfIngestion,
   onOpenCopilot,
-  onOpenControls
+  onOpenControls,
+  onOpenKeyboardHelp
 }) {
   const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -177,6 +179,18 @@ export default function Header({
           >
             <Sliders className="w-3.5 h-3.5 text-[#0C969C]" />
             <span className="font-medium text-[11px] hidden sm:inline">{t('story.controls', 'Controls')}</span>
+          </button>
+        )}
+
+        {/* Phase 1.4: Keyboard Shortcuts Help Trigger */}
+        {onOpenKeyboardHelp && (
+          <button
+            onClick={onOpenKeyboardHelp}
+            title="Keyboard Shortcuts & Accessibility (?)"
+            aria-label="Keyboard Shortcuts Help"
+            className="hidden sm:flex items-center justify-center p-2 rounded-xl bg-[#142D3A] hover:bg-[#183746] border border-[#214555] hover:border-[#0C969C] text-[#8FA8B2] hover:text-[#CCD0CF] transition-all cursor-pointer shrink-0"
+          >
+            <Keyboard className="w-3.5 h-3.5 text-[#0C969C]" />
           </button>
         )}
 

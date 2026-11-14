@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Sliders, Palette, Eye, RotateCcw, Activity, Layers } from 'lucide-react';
 import { PARAMETERS } from '../../data/oceanData';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 export const COLOR_PALETTES = [
   {
@@ -59,6 +60,10 @@ export default function ColorbarSettingsModal({
   setCustomRanges
 }) {
   const { t } = useTranslation();
+  const modalRef = useRef(null);
+
+  useFocusTrap(isOpen, modalRef, onClose);
+
   if (!isOpen) return null;
 
   const currentParamConfig = PARAMETERS[selectedParam] || PARAMETERS.sst;
@@ -101,10 +106,17 @@ export default function ColorbarSettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 select-none animate-in fade-in duration-200">
-      <div className="glass-panel rounded-3xl p-6 border border-sky-400/40 shadow-glow-blue max-w-xl w-full relative max-h-[90vh] overflow-y-auto flex flex-col">
+      <div 
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('colorbar.title', 'Colorbar & 3D Volumetric Controls')}
+        className="glass-panel rounded-3xl p-6 border border-sky-400/40 shadow-glow-blue max-w-xl w-full relative max-h-[90vh] overflow-y-auto flex flex-col"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
+          aria-label={t('common.close', 'Close dialog')}
           className="absolute top-4 right-4 p-2 rounded-xl bg-sky-500/10 text-sky-300 hover:text-white hover:bg-sky-500/20 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />

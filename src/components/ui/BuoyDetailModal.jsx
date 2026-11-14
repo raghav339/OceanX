@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Radio, Clock, MapPin, Navigation, Activity, Droplets, Thermometer, Sparkles, Wind, Cpu } from 'lucide-react';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 export default function BuoyDetailModal({ buoy, onClose }) {
   const { t } = useTranslation();
   const [activeVariable, setActiveVariable] = useState('temp');
+  const modalRef = useRef(null);
+
+  useFocusTrap(Boolean(buoy), modalRef, onClose);
 
   if (!buoy) return null;
 
@@ -98,11 +102,18 @@ export default function BuoyDetailModal({ buoy, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 select-none">
-      <div className="glass-panel rounded-3xl p-6 border border-sky-400/40 shadow-glow-blue max-w-xl w-full relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[92vh] overflow-y-auto">
+      <div 
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={buoy.name || t('buoyDetail.title', 'Sensor Platform Profile')}
+        className="glass-panel rounded-3xl p-6 border border-sky-400/40 shadow-glow-blue max-w-xl w-full relative animate-in fade-in zoom-in duration-200 flex flex-col max-h-[92vh] overflow-y-auto"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-xl bg-sky-500/10 text-sky-300 hover:text-white hover:bg-sky-500/20 transition-colors"
+          aria-label={t('common.close', 'Close dialog')}
+          className="absolute top-4 right-4 p-2 rounded-xl bg-sky-500/10 text-sky-300 hover:text-white hover:bg-sky-500/20 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>

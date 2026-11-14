@@ -23,6 +23,7 @@ import { VALIDATION_METRICS } from '../../data/oceanData';
 import { getFormattedCurrentDate } from '../../utils/dateUtils';
 import { buildOceanContext } from '../../lib/ai/oceanContext';
 import { processOfflineCopilotQuery } from '../../lib/ai/offlineEngine';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 export default function AnalyticReportModal({
   isOpen,
@@ -33,6 +34,8 @@ export default function AnalyticReportModal({
 }) {
   const { t } = useTranslation();
   const printRef = useRef(null);
+
+  useFocusTrap(isOpen, printRef, onClose);
 
   const lat = activeRegion?.lat ?? 15.297;
   const lon = activeRegion?.lon ?? 87.860;
@@ -82,6 +85,9 @@ export default function AnalyticReportModal({
       <div 
         id="analytic-printable-report"
         ref={printRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('report.dossierTitle', 'Oceanographic Telemetry & Digital Twin Dossier')}
         className="glass-panel rounded-3xl p-6 md:p-8 border border-sky-500/40 shadow-2xl max-w-4xl w-full relative max-h-[94vh] flex flex-col bg-[#050f26] text-slate-100 overflow-y-auto"
       >
         {/* Modal Top Bar (Hidden during print) */}

@@ -1,18 +1,30 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Brain, ShieldAlert, Sparkles } from 'lucide-react';
 import { AI_ANOMALY } from '../../data/oceanData';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 export default function AnomalyModal({ isOpen, onClose }) {
   const { t } = useTranslation();
+  const modalRef = useRef(null);
+
+  useFocusTrap(isOpen, modalRef, onClose);
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 select-none">
-      <div className="glass-panel glow-border-red rounded-3xl p-6 border border-red-500/60 shadow-glow-red max-w-xl w-full relative animate-in fade-in zoom-in duration-200 bg-gradient-to-b from-[#180814] to-[#08122b]">
+      <div 
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('anomalyModal.title', 'AI Diagnostics: Subsurface Thermal Anomaly')}
+        className="glass-panel glow-border-red rounded-3xl p-6 border border-red-500/60 shadow-glow-red max-w-xl w-full relative animate-in fade-in zoom-in duration-200 bg-gradient-to-b from-[#180814] to-[#08122b]"
+      >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 text-red-300 hover:text-white hover:bg-red-500/20 transition-colors"
+          aria-label={t('common.close', 'Close dialog')}
+          className="absolute top-4 right-4 p-2 rounded-xl bg-red-500/10 text-red-300 hover:text-white hover:bg-red-500/20 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>

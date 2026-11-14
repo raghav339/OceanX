@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Compass, Navigation, Globe, Check, Search, ArrowRight } from 'lucide-react';
 import { REGIONS, createLocationData } from '../../data/oceanData';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 export default function LocationModal({ isOpen, onClose, activeRegion, onSelectRegion, onCustomCoords }) {
   const { t } = useTranslation();
   const [customLat, setCustomLat] = useState('15.297');
   const [customLon, setCustomLon] = useState('87.860');
   const [searchQuery, setSearchQuery] = useState('');
+  const modalRef = useRef(null);
+
+  useFocusTrap(isOpen, modalRef, onClose);
 
   if (!isOpen) return null;
 
@@ -29,10 +33,17 @@ export default function LocationModal({ isOpen, onClose, activeRegion, onSelectR
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 select-none animate-in fade-in duration-200">
-      <div className="glass-panel rounded-3xl p-6 border border-cyan-400/40 shadow-glow-cyan max-w-xl w-full relative">
+      <div 
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('locationModal.title', 'Global Ocean Basin & Coordinate Navigator')}
+        className="glass-panel rounded-3xl p-6 border border-cyan-400/40 shadow-glow-cyan max-w-xl w-full relative"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
+          aria-label={t('common.close', 'Close dialog')}
           className="absolute top-4 right-4 p-2 rounded-xl bg-sky-500/10 text-sky-300 hover:text-white hover:bg-sky-500/20 transition-colors"
         >
           <X className="w-5 h-5" />

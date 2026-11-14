@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import useFocusTrap from '../../hooks/useFocusTrap';
 import { 
   X, 
   UploadCloud, 
@@ -104,6 +105,10 @@ export default function NetcdfIngestionModal({
     oxygen: 'oxygen'
   });
 
+  const modalRef = useRef(null);
+
+  useFocusTrap(isOpen, modalRef, onClose);
+
   if (!isOpen) return null;
 
   const currentDataset = PRESET_DATASETS.find((d) => d.id === selectedPresetId) || PRESET_DATASETS[0];
@@ -142,10 +147,17 @@ export default function NetcdfIngestionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 select-none animate-in fade-in duration-200">
-      <div className="glass-panel rounded-3xl p-6 border border-sky-400/40 shadow-glow-blue max-w-3xl w-full relative max-h-[92vh] overflow-y-auto flex flex-col">
+      <div 
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="NetCDF / HDF5 Oceanic Grid Ingestion Engine"
+        className="glass-panel rounded-3xl p-6 border border-sky-400/40 shadow-glow-blue max-w-3xl w-full relative max-h-[92vh] overflow-y-auto flex flex-col"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
+          aria-label="Close dialog"
           className="absolute top-4 right-4 p-2 rounded-xl bg-sky-500/10 text-sky-300 hover:text-white hover:bg-sky-500/20 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />

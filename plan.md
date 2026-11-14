@@ -58,7 +58,7 @@
 
 ---
 
-#### 1.4 Keyboard Shortcuts & Accessibility
+#### 1.4 Keyboard Shortcuts & Accessibility (Completed ✅)
 **Problem:** No keyboard navigation; app is mouse-only.
 **Plan:**
 - Global shortcut map: `Space` = play/pause, `1-6` = switch parameter, `↑/↓` = depth ±50 m, `Esc` = close modal, `C` = toggle copilot, `M` = world map.

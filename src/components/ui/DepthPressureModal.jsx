@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   X, 
@@ -14,6 +14,7 @@ import {
   generatePressureDepthProfile,
   calculateGravity
 } from '../../utils/pressureCalculator';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 export default function DepthPressureModal({ 
   isOpen, 
@@ -29,6 +30,9 @@ export default function DepthPressureModal({
   const [depth, setDepth] = useState(initialDepth);
   const [sst, setSst] = useState(28.5);
   const [salinity, setSalinity] = useState(34.5);
+  const modalRef = useRef(null);
+
+  useFocusTrap(isOpen, modalRef, onClose);
 
   if (!isOpen) return null;
 
@@ -45,11 +49,18 @@ export default function DepthPressureModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 select-none animate-in fade-in duration-200">
-      <div className="glass-panel rounded-3xl p-6 border border-cyan-500/40 shadow-glow-cyan max-w-4xl w-full relative max-h-[92vh] flex flex-col bg-gradient-to-b from-[#081b3a] via-[#041026] to-[#020713]">
+      <div 
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('depthPressure.title', 'Ocean Hydrostatic Pressure & Depth Profiler')}
+        className="glass-panel rounded-3xl p-6 border border-cyan-500/40 shadow-glow-cyan max-w-4xl w-full relative max-h-[92vh] flex flex-col bg-gradient-to-b from-[#081b3a] via-[#041026] to-[#020713]"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-xl bg-cyan-500/10 text-cyan-300 hover:text-white hover:bg-cyan-500/25 transition-colors"
+          aria-label={t('common.close', 'Close dialog')}
+          className="absolute top-4 right-4 p-2 rounded-xl bg-cyan-500/10 text-cyan-300 hover:text-white hover:bg-cyan-500/25 transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>

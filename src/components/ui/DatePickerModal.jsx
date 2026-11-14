@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Calendar as CalendarIcon, Check, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { parseDateString, getFormattedCurrentDate } from '../../utils/dateUtils';
+import useFocusTrap from '../../hooks/useFocusTrap';
 
 export default function DatePickerModal({ isOpen, onClose, currentDate, onSelectDate }) {
   const { t } = useTranslation();
@@ -9,6 +10,9 @@ export default function DatePickerModal({ isOpen, onClose, currentDate, onSelect
   const [selectedYear, setSelectedYear] = useState(initialParsed.year);
   const [selectedMonth, setSelectedMonth] = useState(initialParsed.month);
   const [selectedDay, setSelectedDay] = useState(initialParsed.day);
+  const modalRef = useRef(null);
+
+  useFocusTrap(isOpen, modalRef, onClose);
 
   useEffect(() => {
     if (isOpen && currentDate) {
@@ -68,10 +72,17 @@ export default function DatePickerModal({ isOpen, onClose, currentDate, onSelect
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 select-none animate-in fade-in duration-200">
-      <div className="glass-panel rounded-3xl p-6 border border-cyan-400/40 shadow-glow-cyan max-w-lg w-full relative">
+      <div 
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('datePicker.title', 'Satellite & In-Situ Observation Date Picker')}
+        className="glass-panel rounded-3xl p-6 border border-cyan-400/40 shadow-glow-cyan max-w-lg w-full relative"
+      >
         {/* Close Button */}
         <button
           onClick={onClose}
+          aria-label={t('common.close', 'Close dialog')}
           className="absolute top-4 right-4 p-2 rounded-xl bg-sky-500/10 text-sky-300 hover:text-white hover:bg-sky-500/20 transition-colors"
         >
           <X className="w-5 h-5" />
