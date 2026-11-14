@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { 
   X, 
   Layers, 
-  Eye, 
   Palette, 
   Sliders, 
   Clock, 
@@ -20,7 +19,7 @@ import {
   Waves,
   Maximize2
 } from 'lucide-react';
-import { VIEW_MODES, DEPTH_LEVELS, PARAMETERS } from '../../data/oceanData';
+import { VIEW_MODES, PARAMETERS } from '../../data/oceanData';
 import { COLOR_PALETTES } from './ColorbarSettingsModal';
 
 export default function AdvancedControlsDrawer({
@@ -196,6 +195,40 @@ export default function AdvancedControlsDrawer({
               </div>
             )}
           </section>
+
+          {/* SECTION 1B: Active Oceanographic Parameter */}
+          {setSelectedParam && (
+            <section className="space-y-2.5">
+              <div className="flex items-center justify-between text-[11px] font-bold text-[#8FA8B2] uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <Gauge className="w-3.5 h-3.5 text-[#0C969C]" />
+                  {t('controls.oceanParameters', 'Ocean Parameters')}
+                </span>
+                <span className="text-[10px] font-mono text-[#0C969C]">
+                  {PARAMETERS[selectedParam]?.name || selectedParam}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {Object.values(PARAMETERS).map((param) => {
+                  const isSel = selectedParam === param.id;
+                  return (
+                    <button
+                      key={param.id}
+                      onClick={() => setSelectedParam(param.id)}
+                      className={`px-2 py-2 rounded-xl text-center font-medium transition-all cursor-pointer border flex flex-col items-center justify-center gap-0.5 ${
+                        isSel
+                          ? 'bg-[#0C969C]/20 border-[#0C969C]/60 text-[#00FFC8] shadow-sm font-semibold'
+                          : 'bg-[#0D202B] border-[#193544] text-[#8FA8B2] hover:bg-[#142D3A] hover:text-[#CCD0CF]'
+                      }`}
+                    >
+                      <span className="text-[11px] truncate w-full">{t(`parameters.${param.id}`, param.name)}</span>
+                      <span className="text-[9px] font-mono text-[#637C87]">({param.unit})</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {/* SECTION 2: Shaders, Palettes & 3D Optics */}
           <section className="space-y-3 p-3.5 rounded-xl bg-[#0D202B] border border-[#193544]">

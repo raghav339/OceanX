@@ -306,7 +306,7 @@ export function resolveLocation(queryOrLocation, fallbackRegion) {
   // 1. Check for specific coastal cities, ports, beaches, and island territories
   for (const loc of COASTAL_LOCATIONS) {
     for (const alias of loc.aliases) {
-      const isAscii = /^[\x00-\x7F]*$/.test(alias);
+      const isAscii = /^[\x20-\x7E]*$/.test(alias);
       const matched = isAscii 
         ? new RegExp(`\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(clean)
         : clean.includes(alias);
@@ -580,7 +580,7 @@ export function tool_find_ocean_anomalies(args = {}, currentState = {}) {
 // -------------------------------------------------------------
 // TOOL 5: change_ocean_view
 // -------------------------------------------------------------
-export function tool_change_ocean_view(args = {}, currentState = {}) {
+export function tool_change_ocean_view(args = {}, _currentState = {}) {
   const actions = [];
   const changes = [];
 

@@ -1,9 +1,7 @@
 import assert from 'node:assert';
 import { 
-  VOICE_LANGUAGE_CONFIGS, 
   getVoiceConfigForLanguage, 
   getSpeechLocale, 
-  getPhraseHints,
   validateAllLanguagesMapped,
   OCEAN_SCIENTIFIC_PHRASE_HINTS
 } from '../src/lib/ai/voiceLanguages.js';
@@ -12,7 +10,6 @@ import { cleanTextForSpeech } from '../src/lib/ai/voice/ttsProvider.js';
 import { AudioState, SpeechErrorCode } from '../src/lib/ai/voice/speechProvider.js';
 import { WebSpeechProvider } from '../src/lib/ai/voice/webSpeechProvider.js';
 import { extractIntentAndEntities, executeNeridaReasoning } from '../src/lib/ai/offlineEngine.js';
-import { resolveLocation } from '../src/lib/ai/oceanTools.js';
 import { getCopilotLexicon } from '../src/lib/ai/copilotTranslations.js';
 
 console.log('=== TEST 1: 23-Language Voice Registry Coverage ===');

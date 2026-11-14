@@ -18,6 +18,19 @@ import { REGIONS } from '../../data/oceanData';
 import { COASTAL_BEACHES, calculateBeachRainForecast } from '../../data/beachData';
 import { calculateHydrostaticPressure } from '../../utils/pressureCalculator';
 
+// Fixed Station Cards matching the reference map
+const FIXED_STATIONS = [
+  { id: 'ST-46001', name: 'Station 46001', basin: 'North Pacific', lat: 28.2, lon: -145.6, sst: 26.1, wave: 1.2, depth: 3600 },
+  { id: 'ST-EQPAC', name: 'Equatorial Pacific (El Niño)', basin: 'Equatorial Pacific', lat: 0.0, lon: -140.0, sst: 29.8, wave: 1.7, depth: 4400 },
+  { id: 'ST-55012', name: 'Station 55012', basin: 'South Pacific', lat: -32.4, lon: -123.7, sst: 18.7, wave: 2.1, depth: 4100 },
+  { id: 'ST-62019', name: 'Station 62019', basin: 'North Atlantic Ocean', lat: 48.3, lon: -12.6, sst: 17.3, wave: 1.8, depth: 2100 },
+  { id: 'ST-NATL', name: 'North Atlantic Ocean Station', basin: 'North Atlantic Ocean', lat: 35.0, lon: -40.0, sst: 22.4, wave: 2.2, depth: 4800 },
+  { id: 'ST-BOB', name: 'Bay of Bengal Deep Station', basin: 'Bay of Bengal', lat: 15.3, lon: 87.9, sst: 28.9, wave: 1.6, depth: 2850 },
+  { id: 'ST-ARAB', name: 'Arabian Sea Station', basin: 'Arabian Sea', lat: 18.4, lon: 66.8, sst: 29.1, wave: 2.3, depth: 3100 },
+  { id: 'ST-71023', name: 'Station 71023', basin: 'South Indian Ocean', lat: -41.2, lon: 86.8, sst: 12.4, wave: 2.4, depth: 4500 },
+  { id: 'ST-80045', name: 'Station 80045', basin: 'West Australian Basin', lat: -20.5, lon: 114.3, sst: 24.6, wave: 1.6, depth: 3900 }
+];
+
 export default function DataExplorerView({ onSelectRegion, onNavigateTab, onOpenNetcdfIngestion }) {
   const [selectedBasin, setSelectedBasin] = useState('all');
   const [selectedParam, setSelectedParam] = useState('all');
@@ -34,19 +47,6 @@ export default function DataExplorerView({ onSelectRegion, onNavigateTab, onOpen
     const lonDir = lon >= 0 ? 'E' : 'W';
     return `${Math.abs(lat).toFixed(2)}° ${latDir}, ${Math.abs(lon).toFixed(2)}° ${lonDir}`;
   };
-
-  // Fixed Station Cards matching the reference map
-  const fixedStations = [
-    { id: 'ST-46001', name: 'Station 46001', basin: 'North Pacific', lat: 28.2, lon: -145.6, sst: 26.1, wave: 1.2, depth: 3600 },
-    { id: 'ST-EQPAC', name: 'Equatorial Pacific (El Niño)', basin: 'Equatorial Pacific', lat: 0.0, lon: -140.0, sst: 29.8, wave: 1.7, depth: 4400 },
-    { id: 'ST-55012', name: 'Station 55012', basin: 'South Pacific', lat: -32.4, lon: -123.7, sst: 18.7, wave: 2.1, depth: 4100 },
-    { id: 'ST-62019', name: 'Station 62019', basin: 'North Atlantic Ocean', lat: 48.3, lon: -12.6, sst: 17.3, wave: 1.8, depth: 2100 },
-    { id: 'ST-NATL', name: 'North Atlantic Ocean Station', basin: 'North Atlantic Ocean', lat: 35.0, lon: -40.0, sst: 22.4, wave: 2.2, depth: 4800 },
-    { id: 'ST-BOB', name: 'Bay of Bengal Deep Station', basin: 'Bay of Bengal', lat: 15.3, lon: 87.9, sst: 28.9, wave: 1.6, depth: 2850 },
-    { id: 'ST-ARAB', name: 'Arabian Sea Station', basin: 'Arabian Sea', lat: 18.4, lon: 66.8, sst: 29.1, wave: 2.3, depth: 3100 },
-    { id: 'ST-71023', name: 'Station 71023', basin: 'South Indian Ocean', lat: -41.2, lon: 86.8, sst: 12.4, wave: 2.4, depth: 4500 },
-    { id: 'ST-80045', name: 'Station 80045', basin: 'West Australian Basin', lat: -20.5, lon: 114.3, sst: 24.6, wave: 1.6, depth: 3900 }
-  ];
 
   // Synthesize comprehensive oceanographic records from all stations & depth levels
   const rawDataset = useMemo(() => {
@@ -127,7 +127,7 @@ export default function DataExplorerView({ onSelectRegion, onNavigateTab, onOpen
     });
 
     // 2. Fixed Global Stations from Map View
-    fixedStations.forEach((st) => {
+    FIXED_STATIONS.forEach((st) => {
       const p = calculateHydrostaticPressure(st.depth, st.lat, st.sst, 35.0);
       records.push({
         id: `${st.id}-SST`,

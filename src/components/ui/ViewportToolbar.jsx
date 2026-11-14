@@ -104,18 +104,16 @@ export default function ViewportToolbar({
   };
   const currentParam = PARAMETERS[selectedParam] || PARAMETERS.sst;
 
-  const activeRange = customRanges[selectedParam] || {
-    min: currentParam.min,
-    max: currentParam.max
-  };
+  const activeMin = customRanges[selectedParam]?.min ?? currentParam.min;
+  const activeMax = customRanges[selectedParam]?.max ?? currentParam.max;
 
   const activePaletteObj = COLOR_PALETTES.find((p) => p.id === palette) || COLOR_PALETTES[0];
   const activeGradient = palette === 'default' ? currentParam.gradientCss : activePaletteObj.gradientCss;
 
   // Generate 5 dynamic tick labels
   const ticks = React.useMemo(() => {
-    const min = activeRange.min;
-    const max = activeRange.max;
+    const min = activeMin;
+    const max = activeMax;
     if (isLogScale && min > 0) {
       const logMin = Math.log10(min);
       const logMax = Math.log10(max);
@@ -128,7 +126,7 @@ export default function ViewportToolbar({
       const val = min + r * (max - min);
       return parseFloat(val.toFixed(val < 10 ? 1 : 0));
     });
-  }, [activeRange, isLogScale]);
+  }, [activeMin, activeMax, isLogScale]);
 
   const modeIcons = {
     surface: Layers,

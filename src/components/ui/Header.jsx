@@ -1,26 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
-  Calendar, 
-  Moon, 
   Bell, 
   Compass, 
-  Globe2, 
-  FileText, 
-  Gauge, 
-  Database,
+  FileText,
   Sliders,
   Maximize2,
   Minimize2,
-  Sparkles,
   Menu,
   X,
-  ChevronDown,
   CloudRain,
   AlertTriangle,
   Zap,
   ShieldAlert,
-  Radio,
   Keyboard
 } from 'lucide-react';
 import LanguageSelector from './LanguageSelector';

@@ -625,7 +625,7 @@ const OceanCanvas = forwardRef(function OceanCanvas({
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.25;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     containerRef.current.replaceChildren(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -1125,11 +1125,11 @@ const OceanCanvas = forwardRef(function OceanCanvas({
 
     // Animation Loop
     let animationFrameId;
-    const clock = new THREE.Clock();
+    const animationStartTime = performance.now();
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
-      const elapsed = clock.getElapsedTime();
+      const elapsed = (performance.now() - animationStartTime) * 0.001;
       const currentProps = propsRef.current;
       const isPlayingCurrent = currentProps.isPlaying;
       const simSpeedCurrent = currentProps.simSpeed;

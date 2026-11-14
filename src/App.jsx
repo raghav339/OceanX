@@ -19,7 +19,6 @@ import DepthPressureModal from './components/ui/DepthPressureModal';
 import DashboardView from './components/ui/DashboardView';
 import DataExplorerView from './components/ui/DataExplorerView';
 import AboutView from './components/ui/AboutView';
-import EnsoSimulationDock from './components/ui/EnsoSimulationDock';
 import EnsoSimulationView from './components/ui/EnsoSimulationView';
 import ColorbarSettingsModal from './components/ui/ColorbarSettingsModal';
 import NetcdfIngestionModal from './components/ui/NetcdfIngestionModal';
@@ -193,7 +192,7 @@ export default function App() {
         name: activeRegion.name || 'Custom Location'
       });
     }
-  }, [activeRegion?.id, activeRegion?.lat, activeRegion?.lon, activeRegion?.name]);
+  }, [activeRegion, activeRegion?.id, activeRegion?.lat, activeRegion?.lon, activeRegion?.name]);
 
   // Phase 1.2: Rehydrate and synchronize i18n language preference
   useEffect(() => {

@@ -22,11 +22,7 @@ import {
   Info,
   Globe2,
   ArrowRight,
-  ShieldAlert,
-  Gauge,
-  BarChart3,
-  Calendar,
-  CloudRain
+  ShieldAlert
 } from 'lucide-react';
 import { PARAMETERS } from '../../data/oceanData';
 
@@ -359,11 +355,11 @@ export default function EnsoSimulationView({ onNavigateTab }) {
     dom.addEventListener('wheel', onWheel, { passive: false });
 
     let animId;
-    const clock = new THREE.Clock();
+    const startTime = performance.now();
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const elapsed = clock.getElapsedTime();
+      const elapsed = (performance.now() - startTime) * 0.001;
 
       if (isPlaying && globeMeshRef.current) {
         globeMeshRef.current.rotation.y += 0.0004;
