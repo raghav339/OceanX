@@ -14,7 +14,9 @@ import {
   Umbrella,
   Layers,
   Plus,
-  Minus
+  Minus,
+  Download,
+  Check
 } from 'lucide-react';
 import { REGIONS, createLocationData } from '../../data/oceanData';
 import { COASTAL_BEACHES, calculateBeachRainForecast } from '../../data/beachData';
@@ -54,6 +56,49 @@ export default function WorldMapView({
   });
 
   const containerRef = useRef(null);
+  const svgRef = useRef(null);
+  const [isExportingSvg, setIsExportingSvg] = useState(false);
+
+  const handleExportSvg = () => {
+    if (!svgRef.current) return;
+    try {
+      const svgNode = svgRef.current.cloneNode(true);
+
+      if (!svgNode.getAttribute('xmlns')) {
+        svgNode.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      }
+      if (!svgNode.getAttribute('xmlns:xlink')) {
+        svgNode.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+      }
+
+      svgNode.setAttribute('width', '1000');
+      svgNode.setAttribute('height', '500');
+      svgNode.style.transform = '';
+
+      const serializer = new XMLSerializer();
+      let svgString = serializer.serializeToString(svgNode);
+
+      if (!svgString.startsWith('<?xml')) {
+        svgString = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + svgString;
+      }
+
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const downloadLink = document.createElement('a');
+      downloadLink.href = url;
+      const layerSlug = (mapLayer || 'map').toLowerCase().replace(/\s+/g, '-');
+      downloadLink.download = `oceanx-world-map-${layerSlug}-${Date.now()}.svg`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(url);
+
+      setIsExportingSvg(true);
+      setTimeout(() => setIsExportingSvg(false), 2200);
+    } catch (err) {
+      console.error('Failed to export World Map as SVG:', err);
+    }
+  };
 
   // Transform lat/lon into SVG canvas coordinates (2000 x 1000 standard equirectangular)
   const geoToSvg = (lat, lon) => {
@@ -539,6 +584,29 @@ export default function WorldMapView({
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
+            <div className="w-px h-4 bg-sky-500/20 mx-0.5" />
+            <button
+              onClick={handleExportSvg}
+              title={isExportingSvg ? "SVG Downloaded!" : t('mapView.exportSvg', 'Export Map as SVG')}
+              aria-label="Export Map as SVG"
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                isExportingSvg
+                  ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
+                  : 'hover:bg-sky-500/20 text-cyan-300'
+              }`}
+            >
+              {isExportingSvg ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline text-[11px]">SVG Saved</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline text-[11px]">{t('mapView.exportSvg', 'Export SVG')}</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -557,6 +625,7 @@ export default function WorldMapView({
           className="relative w-full h-full max-w-[1550px] max-h-[820px] rounded-3xl border border-sky-500/30 overflow-hidden shadow-2xl bg-[#030919] cursor-crosshair"
         >
           <svg 
+            ref={svgRef}
             viewBox="0 0 1000 500" 
             className="w-full h-full"
             style={{

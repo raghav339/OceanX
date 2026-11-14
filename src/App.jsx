@@ -58,6 +58,7 @@ export default function App() {
   const [copilotExternalPrompt, setCopilotExternalPrompt] = useState(null);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [isControlsDrawerOpen, setIsControlsDrawerOpen] = useState(false);
+  const oceanCanvasRef = useRef(null);
 
   // Dynamic Colorbar, Palette, Layer Opacity & 3D Vertical Exaggeration State
   const [palette, setPalette] = usePersistedState('oceanx_pref_palette', 'turbo', {
@@ -622,6 +623,7 @@ export default function App() {
           {/* Center 3D Ocean Digital Twin Viewport */}
           <main className="relative flex-1 h-full overflow-hidden bg-[#06141B] rounded-2xl my-1.5 mx-1 border border-[#193544] shadow-md">
             <OceanCanvas
+              ref={oceanCanvasRef}
               selectedParam={selectedParam}
               depth={depth}
               viewMode={viewMode}
@@ -656,6 +658,7 @@ export default function App() {
               regionName={activeRegion?.name}
               regionCoords={activeRegion?.coords}
               onGetShareUrl={getShareUrl}
+              onExportPng={() => oceanCanvasRef.current?.exportPng()}
             />
           </main>
 

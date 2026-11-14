@@ -142,30 +142,53 @@
   background: #274D60;
 }
 
-/* Print Optimization for Analytical Report */
+/* Print Optimization for Analytical Report PDF Export */
 @media print {
-  body {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 14mm;
+  }
+
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, 
+  body, 
+  #root, 
+  #root > div {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
     background-color: #ffffff !important;
     color: #0f172a !important;
-    overflow: visible !important;
     user-select: text !important;
   }
 
-  /* Hide background canvas, headers, sidebars, controls */
-  header, aside, main, .no-print, [role="dialog"]:not(#analytic-printable-report) {
+  /* Hide background canvas, navigation, headers, sidebars, controls, and other modals */
+  header, 
+  aside, 
+  main, 
+  nav,
+  .no-print, 
+  [role="dialog"]:not(#analytic-printable-report) {
     display: none !important;
   }
 
-  /* Expand modal to full page */
+  /* Expand modal overlay to static document flow */
   .fixed.inset-0 {
     position: static !important;
     background: transparent !important;
     padding: 0 !important;
     overflow: visible !important;
+    display: block !important;
   }
 
   #analytic-printable-report {
+    position: static !important;
     max-width: 100% !important;
+    width: 100% !important;
     max-height: none !important;
     overflow: visible !important;
     box-shadow: none !important;
@@ -173,10 +196,20 @@
     background: #ffffff !important;
     color: #0f172a !important;
     padding: 0 !important;
+    margin: 0 !important;
   }
 
   .printable-content {
     color: #0f172a !important;
+  }
+
+  /* Prevent page-break splits inside structured cards, tables, and metric tiles */
+  .printable-content > div,
+  .printable-content table,
+  .printable-content tr,
+  .printable-content .grid > div {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   .printable-content h1, 
@@ -189,29 +222,41 @@
   .printable-content p, 
   .printable-content span, 
   .printable-content td, 
-  .printable-content th {
-    color: #1e293b !important;
+  .printable-content th,
+  .printable-content div {
+    color: #1e293b;
   }
 
+  /* Light professional card backgrounds for crisp printing on paper */
   .printable-content .bg-\[\#0a1b42\]\/60,
   .printable-content .bg-\[\#081533\],
   .printable-content .bg-\[\#040e24\],
   .printable-content .bg-\[\#091738\],
   .printable-content .bg-\[\#061433\],
   .printable-content .bg-\[\#040e26\],
-  .printable-content .bg-\[\#0a1d48\] {
+  .printable-content .bg-\[\#0a1d48\],
+  .printable-content .bg-\[\#05112a\],
+  .printable-content .bg-\[\#030919\],
+  .printable-content [class*="bg-gradient-to"] {
+    background: #f8fafc !important;
     background-color: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+  }
+
+  /* Tables */
+  .printable-content table {
+    width: 100% !important;
+    border-collapse: collapse !important;
     border: 1px solid #cbd5e1 !important;
   }
 
-  .printable-content table {
-    border-collapse: collapse !important;
-  }
-
   .printable-content th {
-    background-color: #e2e8f0 !important;
+    background-color: #f1f5f9 !important;
     color: #0f172a !important;
-    font-weight: bold !important;
+    font-weight: 700 !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 8px !important;
   }
 
   .printable-content tr {
@@ -220,22 +265,57 @@
 
   .printable-content td {
     color: #1e293b !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 6px 8px !important;
   }
 
+  .printable-content tr:nth-child(even) td {
+    background-color: #f8fafc !important;
+  }
+
+  /* Metric & Status Accents */
   .printable-content .text-cyan-300,
   .printable-content .text-cyan-200,
+  .printable-content .text-cyan-400,
   .printable-content .text-sky-300,
-  .printable-content .text-sky-200 {
+  .printable-content .text-sky-200,
+  .printable-content .text-sky-400 {
     color: #0284c7 !important;
   }
 
   .printable-content .text-amber-300,
-  .printable-content .text-amber-200 {
+  .printable-content .text-amber-200,
+  .printable-content .text-amber-400 {
     color: #b45309 !important;
   }
 
   .printable-content .text-emerald-300,
-  .printable-content .text-emerald-200 {
+  .printable-content .text-emerald-200,
+  .printable-content .text-emerald-400 {
     color: #047857 !important;
+  }
+
+  .printable-content .text-red-300,
+  .printable-content .text-red-400 {
+    color: #b91c1c !important;
+  }
+
+  .printable-content .text-slate-400,
+  .printable-content .text-slate-300 {
+    color: #475569 !important;
+  }
+
+  .printable-content .text-white {
+    color: #0f172a !important;
+  }
+
+  /* Subtle card borders */
+  .printable-content .border-sky-500\/20,
+  .printable-content .border-sky-500\/30,
+  .printable-content .border-sky-500\/40,
+  .printable-content .border-cyan-400\/40,
+  .printable-content .border-red-500\/30,
+  .printable-content .border-white\/5 {
+    border-color: #cbd5e1 !important;
   }
 }

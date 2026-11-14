@@ -13,7 +13,8 @@ import {
   Zap,
   Sliders,
   Link2,
-  Check
+  Check,
+  Camera
 } from 'lucide-react';
 import { PARAMETERS, VIEW_MODES } from '../../data/oceanData';
 import { COLOR_PALETTES } from './ColorbarSettingsModal';
@@ -34,10 +35,37 @@ export default function ViewportToolbar({
   customRanges = {},
   regionName = 'Bay of Bengal',
   regionCoords = '15.297° N, 87.860° E',
-  onGetShareUrl
+  onGetShareUrl,
+  onExportPng
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
+  const [exported, setExported] = useState(false);
+
+  const handleExportPng = () => {
+    if (onExportPng) {
+      onExportPng();
+      setExported(true);
+      setTimeout(() => setExported(false), 2000);
+      return;
+    }
+    const canvas = document.querySelector('canvas');
+    if (canvas) {
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `oceanx-3d-${selectedParam}-${Date.now()}.png`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setExported(true);
+        setTimeout(() => setExported(false), 2000);
+      } catch (err) {
+        console.warn('Failed to export canvas snapshot:', err);
+      }
+    }
+  };
 
   const handleCopyLink = async () => {
     let url = '';
@@ -162,6 +190,27 @@ export default function ViewportToolbar({
           >
             <Layers className="w-4 h-4" />
           </button>
+          {/* Phase 1.5: Export 3D Canvas PNG */}
+          <div className="relative">
+            <button
+              onClick={handleExportPng}
+              title={exported ? "PNG Downloaded!" : "Export 3D View as PNG"}
+              aria-label="Export 3D View as PNG"
+              className={`p-2 rounded-lg transition-all cursor-pointer ${
+                exported
+                  ? 'bg-[#0C969C]/25 text-[#00FFC8] border border-[#0C969C]/60'
+                  : 'text-[#8FA8B2] hover:text-[#CCD0CF] hover:bg-[#142D3A]'
+              }`}
+            >
+              {exported ? <Check className="w-4 h-4 text-[#00FFC8]" /> : <Camera className="w-4 h-4" />}
+            </button>
+            {exported && (
+              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2.5 py-1 text-[10.5px] font-mono font-semibold bg-[#0D202B]/95 text-[#00FFC8] border border-[#00FFC8]/50 rounded-lg shadow-xl whitespace-nowrap z-30 flex items-center gap-1.5 backdrop-blur-md">
+                <Check className="w-3 h-3 text-[#00FFC8]" />
+                <span>PNG Saved!</span>
+              </div>
+            )}
+          </div>
           {/* Phase 1.3: Copy Shareable View Deep-Link */}
           <div className="relative">
             <button

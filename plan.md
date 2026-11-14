@@ -69,14 +69,14 @@
 
 ---
 
-#### 1.5 Animated Data Export
+#### 1.5 Animated Data Export (Completed ✅)
 **Problem:** Export in Data Explorer only produces raw CSV/JSON; no visual export.
-**Plan:**
-- Add **Export as PNG** button on the 3D canvas (uses `renderer.domElement.toDataURL()`).
-- Add **Export as SVG** on the World Map (serialize the SVG element).
-- Add **Export Report PDF** using `window.print()` with a print stylesheet in the Analytic Report modal (already has `handlePrint` but no CSS).
+**Plan & Implementation:**
+- Added **Export as PNG** button directly on the 3D canvas and in the Viewport Toolbar (`OceanCanvas.jsx` with `preserveDrawingBuffer: true`, explicit frame capture via `renderer.domElement.toDataURL()`, and imperative `exportPng` ref API).
+- Added **Export as SVG** on the World Map (`WorldMapView.jsx` serializes the SVG element with `XMLSerializer`, standardizes namespaces, and triggers instant `.svg` download).
+- Added **Export Report PDF** using `window.print()` with a complete print stylesheet in `src/index.css` (custom `@page`, document overflow expansion, background card adaptations, table borders, and `page-break-inside: avoid` rules).
 
-**Files to touch:** `OceanCanvas.jsx`, `WorldMapView.jsx`, `AnalyticReportModal.jsx`, `index.css` (print styles)
+**Files touched:** `src/components/canvas/OceanCanvas.jsx`, `src/components/ui/ViewportToolbar.jsx`, `src/components/ui/WorldMapView.jsx`, `src/components/ui/AnalyticReportModal.jsx`, `src/App.jsx`, `src/index.css`, `tests/test_phase1_5_export.mjs`
 
 ---
 

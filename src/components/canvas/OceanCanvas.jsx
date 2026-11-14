@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
+import { Camera, Check } from 'lucide-react';
 import { generateEarthTopographyTexture, generateBathymetryTexture } from './proceduralTextures';
 import { OceanSurfaceShader, DepthWallShader } from './OceanShaders';
 
@@ -257,7 +258,7 @@ function createTornadoFunnelMesh(radiusTop = 0.16, radiusBottom = 0.03, height =
   return group;
 }
 
-export default function OceanCanvas({
+const OceanCanvas = forwardRef(function OceanCanvas({
   selectedParam = 'sst',
   depth = 50,
   viewMode = 'depth_slice',
@@ -271,8 +272,11 @@ export default function OceanCanvas({
   palette = 'turbo',
   layerOpacity = 0.95,
   verticalExaggeration = 1.0,
-  isLogScale = false
-}) {
+  isLogScale = false,
+  showExportButton = true,
+  onExportPng
+}, ref) {
+  const [isExported, setIsExported] = useState(false);
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
@@ -291,6 +295,42 @@ export default function OceanCanvas({
   const lightningLightRef = useRef(null);
   const raycasterRef = useRef(new THREE.Raycaster());
   const mouseRef = useRef(new THREE.Vector2());
+
+  const handleExportPng = () => {
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return null;
+    try {
+      // Force an explicit render to ensure buffer has the fresh frame
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+      const canvas = rendererRef.current.domElement;
+      const dataUrl = canvas.toDataURL('image/png');
+      const regionId = (propsRef.current?.activeRegion?.id || activeRegion?.id || 'ocean').toLowerCase();
+      const filename = `oceanx-${regionId}-${selectedParam}-${depth}m-${Date.now()}.png`;
+
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setIsExported(true);
+      setTimeout(() => setIsExported(false), 2200);
+
+      if (onExportPng) {
+        onExportPng(dataUrl, filename);
+      }
+      return { dataUrl, filename };
+    } catch (err) {
+      console.error('Failed to export 3D canvas PNG:', err);
+      return null;
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    exportPng: handleExportPng,
+    getCanvas: () => rendererRef.current?.domElement,
+    getRenderer: () => rendererRef.current
+  }));
 
   const propsRef = useRef({
     activeRegion,
@@ -327,7 +367,12 @@ export default function OceanCanvas({
     camera.lookAt(0, -0.35, 0.1);
     cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true, 
+      alpha: true, 
+      powerPreference: 'high-performance',
+      preserveDrawingBuffer: true 
+    });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -968,6 +1013,36 @@ export default function OceanCanvas({
   return (
     <div className="relative w-full h-full overflow-hidden select-none">
       <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+      
+      {/* 3D Canvas Visual PNG Export Button */}
+      {showExportButton && (
+        <div className="absolute bottom-3.5 right-3.5 z-20 pointer-events-auto">
+          <button
+            onClick={handleExportPng}
+            title={isExported ? "PNG Downloaded!" : "Export 3D View as PNG"}
+            aria-label="Export 3D View as PNG"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono transition-all cursor-pointer shadow-lg backdrop-blur-md group ${
+              isExported
+                ? 'bg-[#0C969C]/25 text-[#00FFC8] border-[#0C969C]/60'
+                : 'bg-[#0D202B]/90 hover:bg-[#142D3A] text-[#8FA8B2] hover:text-[#CCD0CF] border-[#193544] hover:border-[#0C969C]/60'
+            }`}
+          >
+            {isExported ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-[#00FFC8]" />
+                <span className="text-[#00FFC8] font-semibold">Saved PNG!</span>
+              </>
+            ) : (
+              <>
+                <Camera className="w-3.5 h-3.5 text-[#0C969C] group-hover:scale-110 transition-transform" />
+                <span>Export PNG</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
-}
+});
+
+export default OceanCanvas;

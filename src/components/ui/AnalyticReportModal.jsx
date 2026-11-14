@@ -12,10 +12,8 @@ import {
   Gauge, 
   CloudRain, 
   Umbrella, 
-  Waves,
   ShieldAlert,
-  Bot,
-  Sparkles
+  Bot
 } from 'lucide-react';
 import { generatePressureDepthProfile, calculateGravity } from '../../utils/pressureCalculator';
 import { getNearestBeaches, calculateBeachRainForecast } from '../../data/beachData';
@@ -46,8 +44,6 @@ export default function AnalyticReportModal({
   const stormProb = activeRegion?.stormProbability ?? 30;
   const rainRate = activeRegion?.rainRate ?? 1.5;
   const rainProb = activeRegion?.rainProbability ?? 35;
-  const chlorophyll = activeRegion?.chlorophyll ?? 1.25;
-  const oxygen = activeRegion?.oxygen ?? 6.85;
 
   const g = calculateGravity(lat);
   const depthProfile = generatePressureDepthProfile(lat, sst, salinity);
@@ -102,6 +98,8 @@ export default function AnalyticReportModal({
           <div className="flex items-center gap-3">
             <button
               onClick={handlePrint}
+              title="Export Report as PDF / Print (Ctrl+P)"
+              aria-label="Export Report as PDF / Print"
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-cyan-500 hover:from-sky-500 hover:to-cyan-400 text-xs font-bold text-white shadow-glow-cyan transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
@@ -420,10 +418,12 @@ export default function AnalyticReportModal({
             </button>
             <button
               onClick={handlePrint}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-cyan-500 hover:from-sky-500 hover:to-cyan-400 text-xs font-bold text-white shadow-glow-cyan transition-all"
+              title="Export Report as PDF / Print (Ctrl+P)"
+              aria-label="Export Report as PDF / Print"
+              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-sky-600 to-cyan-500 hover:from-sky-500 hover:to-cyan-400 text-xs font-bold text-white shadow-glow-cyan transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>{t('report.printAnalyticReport', 'Print Analytic Report')}</span>
+              <span>{t('report.printAnalyticReport', 'Export PDF / Print Report')}</span>
             </button>
           </div>
         </div>
