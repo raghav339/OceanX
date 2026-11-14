@@ -26,7 +26,7 @@
 
 ### Phase 1 — Core Enhancements (High Impact, Low Effort)
 
-#### 1.1 Real-Time Data Refresh & Live Ticker
+#### 1.1 Real-Time Data Refresh & Live Ticker (Completed ✅)
 **Problem:** Data is initialized once; the "Live" badge shows but values don't auto-refresh.
 **Plan:**
 - Add a configurable polling interval (30 s / 60 s / 5 min) that re-calls `getAccurateMeteorology()` for the active region.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/ui/Header';
 import ScrollOceanExperience from './components/ui/ScrollOceanExperience';
 import AdvancedControlsDrawer from './components/ui/AdvancedControlsDrawer';
@@ -87,49 +87,112 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isPlaying, simSpeed]);
 
-  // Asynchronous Live Satellite & Marine Observation Synchronizer
+  // Phase 1.1: Real-Time Data Refresh & Telemetry Polling State
+  // Configurable polling interval: 30s / 60s / 300s (5 min)
+  const [refreshInterval, setRefreshInterval] = useState(60);
+  const [refreshCountdown, setRefreshCountdown] = useState(60);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(() => new Date());
+
+  const activeRegionRef = useRef(activeRegion);
   useEffect(() => {
-    if (!activeRegion?.lat || !activeRegion?.lon) return;
+    activeRegionRef.current = activeRegion;
+  }, [activeRegion]);
 
-    let isMounted = true;
-    const targetLat = activeRegion.lat;
-    const targetLon = activeRegion.lon;
-
-    getAccurateMeteorology(targetLat, targetLon, new Date(), activeRegion.sst).then((liveMet) => {
-      if (!isMounted || !liveMet) return;
-
-      setActiveRegion((prev) => {
-        if (!prev || Math.abs(prev.lat - targetLat) > 0.001 || Math.abs(prev.lon - targetLon) > 0.001) {
-          return prev;
-        }
-
-        return {
-          ...prev,
-          isLive: liveMet.isLive,
-          sst: liveMet.sst ?? prev.sst,
-          currentSpeed: liveMet.currentSpeed ?? prev.currentSpeed,
-          waveHeight: liveMet.waveHeight ?? prev.waveHeight,
-          pressure: liveMet.pressure ?? prev.pressure,
-          windSpeedKmH: liveMet.windSpeedKmH ?? prev.windSpeedKmH,
-          rainProbability: liveMet.rainProbability,
-          rainRate: liveMet.rainRate,
-          stormProbability: liveMet.stormProbability,
-          activeStorm: {
-            ...prev.activeStorm,
-            name: liveMet.isLive ? `${liveMet.weatherLabel} (${liveMet.stormCategory})` : prev.activeStorm?.name,
-            category: liveMet.stormCategory,
-            windSpeed: `${liveMet.windSpeedKmH} km/h`,
-            pressure: `${liveMet.pressure} hPa`,
-            rainfallForecast: `Precipitation chance: ${liveMet.rainProbability}% | Rain rate: ${liveMet.rainRate} mm/h (${liveMet.weatherLabel})`
+  const fetchMeteorologyForRegion = useCallback(async (targetRegion, force = false) => {
+    if (!targetRegion?.lat || !targetRegion?.lon) return;
+    setIsRefreshing(true);
+    try {
+      const targetLat = targetRegion.lat;
+      const targetLon = targetRegion.lon;
+      const liveMet = await getAccurateMeteorology(targetLat, targetLon, new Date(), targetRegion.sst, force);
+      if (liveMet) {
+        setActiveRegion((prev) => {
+          if (!prev || Math.abs(prev.lat - targetLat) > 0.001 || Math.abs(prev.lon - targetLon) > 0.001) {
+            return prev;
           }
-        };
-      });
-    });
 
-    return () => {
-      isMounted = false;
-    };
-  }, [activeRegion?.lat, activeRegion?.lon]);
+          return {
+            ...prev,
+            isLive: liveMet.isLive,
+            sst: liveMet.sst ?? prev.sst,
+            currentSpeed: liveMet.currentSpeed ?? prev.currentSpeed,
+            waveHeight: liveMet.waveHeight ?? prev.waveHeight,
+            pressure: liveMet.pressure ?? prev.pressure,
+            windSpeedKmH: liveMet.windSpeedKmH ?? prev.windSpeedKmH,
+            rainProbability: liveMet.rainProbability,
+            rainRate: liveMet.rainRate,
+            stormProbability: liveMet.stormProbability,
+            activeStorm: {
+              ...prev.activeStorm,
+              name: liveMet.isLive ? `${liveMet.weatherLabel} (${liveMet.stormCategory})` : prev.activeStorm?.name,
+              category: liveMet.stormCategory,
+              windSpeed: `${liveMet.windSpeedKmH} km/h`,
+              pressure: `${liveMet.pressure} hPa`,
+              rainfallForecast: `Precipitation chance: ${liveMet.rainProbability}% | Rain rate: ${liveMet.rainRate} mm/h (${liveMet.weatherLabel})`
+            }
+          };
+        });
+        setLastRefreshedAt(new Date());
+      }
+    } catch (err) {
+      console.warn('Live marine weather fetch failed:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  // Sync when active coordinates change
+  const activeCoordsKey = `${activeRegion?.lat?.toFixed(3)}_${activeRegion?.lon?.toFixed(3)}`;
+  const prevCoordsKeyRef = useRef(activeCoordsKey);
+
+  useEffect(() => {
+    if (prevCoordsKeyRef.current !== activeCoordsKey) {
+      prevCoordsKeyRef.current = activeCoordsKey;
+      if (activeRegionRef.current) {
+        fetchMeteorologyForRegion(activeRegionRef.current, false);
+      }
+      setRefreshCountdown(refreshInterval);
+    }
+  }, [activeCoordsKey, refreshInterval, fetchMeteorologyForRegion]);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    if (activeRegionRef.current) {
+      fetchMeteorologyForRegion(activeRegionRef.current, false);
+    }
+  }, [fetchMeteorologyForRegion]);
+
+  // Periodic polling countdown ticker (Phase 1.1)
+  useEffect(() => {
+    if (!refreshInterval || refreshInterval <= 0) return;
+
+    const timer = setInterval(() => {
+      setRefreshCountdown((prev) => {
+        if (prev <= 1) {
+          if (activeRegionRef.current) {
+            fetchMeteorologyForRegion(activeRegionRef.current, true);
+          }
+          return refreshInterval;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [refreshInterval, fetchMeteorologyForRegion]);
+
+  const handleSelectRefreshInterval = (newInterval) => {
+    setRefreshInterval(newInterval);
+    setRefreshCountdown(newInterval);
+  };
+
+  const handleManualRefresh = () => {
+    setRefreshCountdown(refreshInterval);
+    if (activeRegionRef.current) {
+      fetchMeteorologyForRegion(activeRegionRef.current, true);
+    }
+  };
 
   const formatCurrentTime = (h) => {
     const hh = String(Math.floor(h)).padStart(2, '0');
@@ -378,6 +441,12 @@ export default function App() {
           activeRegion={activeRegion}
           depth={depth}
           onNavigateToMap={() => setActiveTab('Map View')}
+          refreshInterval={refreshInterval}
+          onSelectRefreshInterval={handleSelectRefreshInterval}
+          refreshCountdown={refreshCountdown}
+          isRefreshing={isRefreshing}
+          lastRefreshedAt={lastRefreshedAt}
+          onManualRefresh={handleManualRefresh}
         />
       )}
 

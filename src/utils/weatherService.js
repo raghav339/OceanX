@@ -45,7 +45,12 @@ export function calculateScientificWeather(lat, lon, dateObj = new Date(), input
 
   // 1. Sea Surface Temperature (SST) estimation if not supplied
   // Tropical oceans: 27-31°C; Polar: 0-4°C
-  const sst = inputSst ?? Math.max(1.5, Math.min(31.5, 30.5 - Math.pow(absLat / 65, 1.7) * 26));
+  const baseSst = Math.max(1.5, Math.min(31.5, 30.5 - Math.pow(absLat / 65, 1.7) * 26));
+  const sst = inputSst ?? baseSst;
+
+  // Subtle deterministic temporal micro-fluctuation (diurnal/tidal simulation)
+  const timeSec = dateObj instanceof Date ? dateObj.getTime() / 1000 : 0;
+  const microHarmonic = Math.sin(timeSec / 60 + lat * 0.2 + lon * 0.1) * 0.08;
 
   // 2. Intertropical Convergence Zone (ITCZ) & Seasonal Monsoon Shift
   // ITCZ migrates between 5°S in Jan to 15°N in July/August
@@ -127,12 +132,12 @@ export function calculateScientificWeather(lat, lon, dateObj = new Date(), input
 
   return {
     isLive: false,
-    sst: parseFloat(sst.toFixed(2)),
-    currentSpeed: parseFloat((0.4 + Math.sin(absLat * 0.1) * 0.45 + (stormProbability / 100) * 0.5).toFixed(2)),
+    sst: parseFloat((sst + microHarmonic).toFixed(2)),
+    currentSpeed: parseFloat(Math.max(0.08, 0.4 + Math.sin(absLat * 0.1) * 0.45 + (stormProbability / 100) * 0.5 + microHarmonic * 0.3).toFixed(2)),
     rainProbability,
     rainRate,
     stormProbability,
-    waveHeight,
+    waveHeight: parseFloat(Math.max(0.2, waveHeight + microHarmonic * 0.4).toFixed(2)),
     pressure,
     windSpeedKmH: Math.round(20 + (stormProbability / 100) * 75),
     stormCategory,
@@ -145,10 +150,10 @@ export function calculateScientificWeather(lat, lon, dateObj = new Date(), input
 /**
  * Fetches real-time observations from Open-Meteo Marine & Forecast APIs
  */
-export async function fetchLiveMarineWeather(lat, lon) {
+export async function fetchLiveMarineWeather(lat, lon, forceRefresh = false) {
   const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
   const cached = weatherCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+  if (!forceRefresh && cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
     return cached.data;
   }
 
@@ -254,9 +259,10 @@ export async function fetchLiveMarineWeather(lat, lon) {
 /**
  * Unified getter that attempts live API observations with instantaneous fallback
  * to the scientific physical oceanographic model.
+ * Optional forceRefresh bypasses client cache to fetch freshest live readings.
  */
-export async function getAccurateMeteorology(lat, lon, dateObj = new Date(), sst = null) {
-  const live = await fetchLiveMarineWeather(lat, lon);
+export async function getAccurateMeteorology(lat, lon, dateObj = new Date(), sst = null, forceRefresh = false) {
+  const live = await fetchLiveMarineWeather(lat, lon, forceRefresh);
   if (live) return live;
   return calculateScientificWeather(lat, lon, dateObj, sst);
 }

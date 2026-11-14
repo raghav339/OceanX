@@ -83,6 +83,49 @@
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
 }
 
+/* Phase 1.1: Live Ticker & Parameter Strip Value Transition Highlight Flash */
+@keyframes telemetry-card-flash {
+  0% {
+    background-color: rgba(12, 150, 156, 0.32);
+    border-color: #00FFC8;
+    box-shadow: 0 0 14px rgba(0, 255, 200, 0.45);
+  }
+  45% {
+    background-color: rgba(12, 150, 156, 0.18);
+    border-color: rgba(0, 255, 200, 0.6);
+    box-shadow: 0 0 8px rgba(0, 255, 200, 0.25);
+  }
+  100% {
+    background-color: inherit;
+    border-color: inherit;
+    box-shadow: none;
+  }
+}
+
+@keyframes value-badge-pulse {
+  0% {
+    color: #00FFC8;
+    background-color: rgba(12, 150, 156, 0.35);
+    border-color: #00FFC8;
+    transform: scale(1.08);
+  }
+  50% {
+    color: #67e8f9;
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-telemetry-flash {
+  animation: telemetry-card-flash 1.1s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.animate-value-flash {
+  animation: value-badge-pulse 0.95s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 5px;
