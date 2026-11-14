@@ -47,7 +47,7 @@
 
 ---
 
-#### 1.3 Shareable URL Deep-Links
+#### 1.3 Shareable URL Deep-Links (Completed ✅)
 **Problem:** Users cannot share a specific view (region + parameter + depth).
 **Plan:**
 - Encode `?region=bay_of_bengal&param=sst&depth=100&tab=3D+View` into the URL hash.

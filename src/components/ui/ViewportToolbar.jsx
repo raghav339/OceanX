@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { 
   Home, 
@@ -11,7 +11,9 @@ import {
   Maximize2,
   Compass,
   Zap,
-  Sliders
+  Sliders,
+  Link2,
+  Check
 } from 'lucide-react';
 import { PARAMETERS, VIEW_MODES } from '../../data/oceanData';
 import { COLOR_PALETTES } from './ColorbarSettingsModal';
@@ -31,9 +33,40 @@ export default function ViewportToolbar({
   isLogScale = false,
   customRanges = {},
   regionName = 'Bay of Bengal',
-  regionCoords = '15.297° N, 87.860° E'
+  regionCoords = '15.297° N, 87.860° E',
+  onGetShareUrl
 }) {
   const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyLink = async () => {
+    let url = '';
+    if (onGetShareUrl) {
+      url = onGetShareUrl();
+    } else if (typeof window !== 'undefined') {
+      url = window.location.href;
+    }
+    if (!url) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn('Failed to copy share link:', err);
+    }
+  };
   const currentParam = PARAMETERS[selectedParam] || PARAMETERS.sst;
 
   const activeRange = customRanges[selectedParam] || {
@@ -129,6 +162,26 @@ export default function ViewportToolbar({
           >
             <Layers className="w-4 h-4" />
           </button>
+          {/* Phase 1.3: Copy Shareable View Deep-Link */}
+          <div className="relative">
+            <button
+              onClick={handleCopyLink}
+              title={copied ? "Link Copied!" : "Copy Shareable View Link (Deep-Link)"}
+              className={`p-2 rounded-lg transition-all cursor-pointer ${
+                copied
+                  ? 'bg-[#0C969C]/25 text-[#00FFC8] border border-[#0C969C]/60'
+                  : 'text-[#8FA8B2] hover:text-[#CCD0CF] hover:bg-[#142D3A]'
+              }`}
+            >
+              {copied ? <Check className="w-4 h-4 text-[#00FFC8]" /> : <Link2 className="w-4 h-4" />}
+            </button>
+            {copied && (
+              <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2.5 py-1 text-[10.5px] font-mono font-semibold bg-[#0D202B]/95 text-[#00FFC8] border border-[#00FFC8]/50 rounded-lg shadow-xl whitespace-nowrap z-30 flex items-center gap-1.5 backdrop-blur-md">
+                <Check className="w-3 h-3 text-[#00FFC8]" />
+                <span>Link Copied!</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

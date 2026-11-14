@@ -30,14 +30,19 @@ import { getAccurateMeteorology } from './utils/weatherService';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from './i18n/languages';
 import { usePersistedState, getPersistedValue, setPersistedValue } from './hooks/usePersistedState';
+import { parseUrlState, updateUrlHash, getShareableUrl, VALID_PARAMS, VALID_TABS } from './utils/deepLink';
 
 export default function App() {
   const { i18n } = useTranslation();
 
-  // Phase 1.2: Persistent User Preferences (localStorage) with safe defaults and validation
-  const [activeTab, setActiveTab] = useState('Story View');
+  // Phase 1.3: Restore initial view mode / tab from URL deep-link if present, else fallback
+  const [activeTab, setActiveTab] = useState(() => {
+    const url = parseUrlState();
+    if (url?.tab && VALID_TABS.includes(url.tab)) return url.tab;
+    return 'Story View';
+  });
   const [selectedParam, setSelectedParam] = usePersistedState('oceanx_pref_param', 'sst', {
-    validator: (v) => typeof v === 'string' && ['sst', 'salinity', 'currents', 'wave', 'chlorophyll', 'oxygen'].includes(v)
+    validator: (v) => typeof v === 'string' && VALID_PARAMS.includes(v)
   });
   const [depth, setDepth] = usePersistedState('oceanx_pref_depth', 50, {
     validator: (v) => typeof v === 'number' && !isNaN(v) && v >= 0 && v <= 6000
@@ -69,11 +74,18 @@ export default function App() {
     isPlaying: true
   });
 
-  // Dynamic Location & Meteorological Threat State (Initializes from persisted preference or default)
+  // Dynamic Location & Meteorological Threat State (Initializes from URL deep-link, persisted preference, or default)
   const [selectedDate, setSelectedDate] = useState(() => getFormattedCurrentDate());
   const [activeRegion, setActiveRegion] = useState(() => {
-    const saved = getPersistedValue('oceanx_pref_region', 'bay_of_bengal');
+    const url = parseUrlState();
     const currentDate = getFormattedCurrentDate();
+    if (url?.region && REGIONS[url.region]) {
+      return {
+        ...REGIONS[url.region],
+        date: currentDate
+      };
+    }
+    const saved = getPersistedValue('oceanx_pref_region', 'bay_of_bengal');
     if (typeof saved === 'string' && REGIONS[saved]) {
       return {
         ...REGIONS[saved],
@@ -89,6 +101,67 @@ export default function App() {
     };
   });
   const [isStormLayerActive, setIsStormLayerActive] = useState(false);
+
+  // Phase 1.3: Rehydrate initial deep-link parameters on mount
+  useEffect(() => {
+    const url = parseUrlState();
+    if (!url) return;
+    if (url.param && VALID_PARAMS.includes(url.param)) {
+      setSelectedParam(url.param);
+    }
+    if (typeof url.depth === 'number' && !isNaN(url.depth)) {
+      setDepth(url.depth);
+    }
+  }, [setSelectedParam, setDepth]);
+
+  // Phase 1.3: Encode current view (region + param + depth + tab) into URL hash
+  useEffect(() => {
+    updateUrlHash({
+      region: activeRegion?.id,
+      param: selectedParam,
+      depth: depth,
+      tab: activeTab
+    });
+  }, [activeRegion?.id, selectedParam, depth, activeTab]);
+
+  // Phase 1.3: Listen to browser hash changes (back/forward history and manual hash edits)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const url = parseUrlState();
+      if (!url) return;
+      if (url.tab && VALID_TABS.includes(url.tab)) {
+        setActiveTab(url.tab);
+      }
+      if (url.param && VALID_PARAMS.includes(url.param)) {
+        setSelectedParam(url.param);
+      }
+      if (typeof url.depth === 'number' && !isNaN(url.depth)) {
+        setDepth(url.depth);
+      }
+      if (url.region && REGIONS[url.region]) {
+        setActiveRegion((prev) => {
+          if (prev?.id === url.region) return prev;
+          return {
+            ...REGIONS[url.region],
+            date: getFormattedCurrentDate()
+          };
+        });
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [setSelectedParam, setDepth]);
+
+  // Phase 1.3: Helper to get shareable deep-link URL
+  const getShareUrl = useCallback(() => {
+    return getShareableUrl({
+      region: activeRegion?.id,
+      param: selectedParam,
+      depth: depth,
+      tab: activeTab
+    });
+  }, [activeRegion?.id, selectedParam, depth, activeTab]);
 
   // Phase 1.2: Serialize activeRegion to localStorage on change
   useEffect(() => {
@@ -472,6 +545,7 @@ export default function App() {
               customRanges={customRanges}
               regionName={activeRegion?.name}
               regionCoords={activeRegion?.coords}
+              onGetShareUrl={getShareUrl}
             />
           </main>
 
