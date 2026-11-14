@@ -36,7 +36,9 @@ export default function ViewportToolbar({
   regionName = 'Bay of Bengal',
   regionCoords = '15.297° N, 87.860° E',
   onGetShareUrl,
-  onExportPng
+  onExportPng,
+  isoLevel = 0.5,
+  setIsoLevel
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -270,7 +272,28 @@ export default function ViewportToolbar({
       </div>
 
       {/* 4. Center-Bottom 3D View Mode Selector Bar */}
-      <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 z-20">
+      <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2">
+        {/* Isosurface Extraction Threshold Slider (Shown only in isosurface mode) */}
+        {viewMode === 'isosurface' && (
+          <div className="bg-[#0D202B]/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl flex items-center gap-3 border border-[#0C969C]/40 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#CCD0CF] whitespace-nowrap">
+              <Maximize2 className="w-3.5 h-3.5 text-[#00FFC8]" />
+              <span>{t('viewModes.isoLevel', 'Iso Level')}:</span>
+              <span className="font-mono text-[#00FFC8] w-9 text-right">{Math.round(isoLevel * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.05"
+              max="0.95"
+              step="0.01"
+              value={isoLevel}
+              onChange={(e) => setIsoLevel && setIsoLevel(parseFloat(e.target.value))}
+              aria-label="Isosurface Extraction Threshold Level"
+              className="w-28 sm:w-36 h-1.5 bg-[#142D3A] rounded-lg appearance-none cursor-pointer accent-[#0C969C]"
+            />
+          </div>
+        )}
+
         <div className="bg-[#0D202B] p-1 rounded-xl flex items-center gap-1 border border-[#193544] shadow-sm">
           {VIEW_MODES.map((mode) => {
             const Icon = modeIcons[mode.id] || Layers;

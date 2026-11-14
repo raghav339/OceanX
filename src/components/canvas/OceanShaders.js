@@ -13,7 +13,8 @@ export const OceanSurfaceShader = {
     uEnsoIntensity: { value: 0.75 }, // 0.0 to 1.0
     uPalette: { value: 0 }, // 0: Default, 1: Turbo, 2: Viridis, 3: Thermal, 4: Coolwarm, 5: Jet
     uOpacity: { value: 0.95 },
-    uLogScale: { value: 0 }
+    uLogScale: { value: 0 },
+    uIsoLevel: { value: 0.5 }
   },
   vertexShader: `
     varying vec2 vUv;
@@ -70,6 +71,7 @@ export const OceanSurfaceShader = {
     uniform int uPalette;
     uniform float uOpacity;
     uniform int uLogScale;
+    uniform float uIsoLevel;
     
     varying vec2 vUv;
     varying vec3 vWorldPosition;
@@ -290,6 +292,23 @@ export const OceanSurfaceShader = {
 
       // Blend streamline vector flow
       vec3 surfaceCol = mix(color, vec3(1.0, 1.0, 1.0), whiteStreamline * 0.65);
+
+      if (uMode == 3) {
+        // Isosurface extraction mode: draw crisp iso-contour lines across the surface heatmap
+        float numBands = 9.0;
+        float bandPhase = fract(mappedVal * numBands);
+        float contour = smoothstep(0.06, 0.0, abs(bandPhase - 0.5));
+
+        // Highlight active uIsoLevel with a thicker, brighter contour
+        float distToIso = abs(mappedVal - clamp(uIsoLevel, 0.0, 1.0));
+        float isoGlow = smoothstep(0.025, 0.0, distToIso);
+        float isoCore = smoothstep(0.009, 0.0, distToIso);
+
+        // Darken between contours to give clean stepped isoband appearance
+        surfaceCol = mix(color * 0.85, vec3(1.0, 1.0, 1.0), contour * 0.65);
+        surfaceCol = mix(surfaceCol, vec3(1.0, 0.95, 0.3), isoGlow * 0.6);
+        surfaceCol = mix(surfaceCol, vec3(1.0, 1.0, 1.0), isoCore * 0.95);
+      }
       
       // Dynamic white wave foam / whitecaps on rolling wave peaks
       vec3 foamColor = vec3(0.92, 0.98, 1.0);
@@ -314,7 +333,8 @@ export const DepthWallShader = {
     uEnsoIntensity: { value: 0.75 },
     uPalette: { value: 0 },
     uOpacity: { value: 0.95 },
-    uLogScale: { value: 0 }
+    uLogScale: { value: 0 },
+    uIsoLevel: { value: 0.5 }
   },
   vertexShader: `
     varying vec2 vUv;
@@ -339,6 +359,7 @@ export const DepthWallShader = {
     uniform int uPalette;
     uniform float uOpacity;
     uniform int uLogScale;
+    uniform float uIsoLevel;
 
     void main() {
       // Wavy stratification layer deformation matching reference image
@@ -403,6 +424,252 @@ export const DepthWallShader = {
       vec3 finalCol = depthColor + vec3(gridLines * 0.65) + vec3(verticalGrid);
 
       gl_FragColor = vec4(finalCol, 0.94 * uOpacity);
+    }
+  `
+};
+
+// 3D Volumetric interior horizontal layer shader for semi-transparent stacked slice volumes
+export const VolumeLayerShader = {
+  uniforms: {
+    uTime: { value: 0 },
+    uParamType: { value: 0 },
+    uPalette: { value: 1 },
+    uOpacity: { value: 0.95 },
+    uLogScale: { value: 0 },
+    uEnsoPhase: { value: 1 },
+    uEnsoIntensity: { value: 0.75 },
+    uLayerDepthRatio: { value: 0.0 }
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vWorldPosition;
+
+    void main() {
+      vUv = uv;
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldPosition = worldPos.xyz;
+      gl_Position = projectionMatrix * viewMatrix * worldPos;
+    }
+  `,
+  fragmentShader: `
+    uniform float uTime;
+    uniform int uParamType;
+    uniform int uPalette;
+    uniform float uOpacity;
+    uniform int uLogScale;
+    uniform float uIsoLevel;
+    uniform int uEnsoPhase;
+    uniform float uEnsoIntensity;
+    uniform float uLayerDepthRatio;
+    
+    varying vec2 vUv;
+    varying vec3 vWorldPosition;
+
+    vec3 colormapTurbo(float x) {
+      x = clamp(x, 0.0, 1.0);
+      const vec4 kRedVec4 = vec4(0.13572138, 4.61539260, -42.66032258, 132.13108234);
+      const vec4 kGreenVec4 = vec4(0.09140261, 2.19418839, 4.84296658, -14.18503333);
+      const vec4 kBlueVec4 = vec4(0.10667330, 12.64194608, -60.58204836, 110.36276771);
+      const vec2 kRedVec2 = vec2(-152.94239396, 59.28637943);
+      const vec2 kGreenVec2 = vec2(4.27729857, 2.82956604);
+      const vec2 kBlueVec2 = vec2(-89.90310912, 27.34824973);
+      vec4 v4 = vec4(1.0, x, x * x, x * x * x);
+      vec2 v2 = v4.zw * v4.z;
+      return clamp(vec3(
+        dot(v4, kRedVec4) + dot(v2, kRedVec2),
+        dot(v4, kGreenVec4) + dot(v2, kGreenVec2),
+        dot(v4, kBlueVec4) + dot(v2, kBlueVec2)
+      ), 0.0, 1.0);
+    }
+
+    vec3 colormapViridis(float t) {
+      vec3 c0 = vec3(0.267, 0.004, 0.329);
+      vec3 c1 = vec3(0.190, 0.407, 0.556);
+      vec3 c2 = vec3(0.208, 0.718, 0.472);
+      vec3 c3 = vec3(0.993, 0.906, 0.143);
+      if (t < 0.33) return mix(c0, c1, t / 0.33);
+      if (t < 0.66) return mix(c1, c2, (t - 0.33) / 0.33);
+      return mix(c2, c3, (t - 0.66) / 0.34);
+    }
+
+    vec3 colormapThermal(float t) {
+      vec3 c0 = vec3(0.01, 0.02, 0.15);
+      vec3 c1 = vec3(0.35, 0.04, 0.45);
+      vec3 c2 = vec3(0.85, 0.22, 0.25);
+      vec3 c3 = vec3(0.98, 0.75, 0.25);
+      vec3 c4 = vec3(1.0, 1.0, 0.95);
+      if (t < 0.25) return mix(c0, c1, t / 0.25);
+      if (t < 0.50) return mix(c1, c2, (t - 0.25) / 0.25);
+      if (t < 0.75) return mix(c2, c3, (t - 0.50) / 0.25);
+      return mix(c3, c4, (t - 0.75) / 0.25);
+    }
+
+    vec3 colormapCoolwarm(float t) {
+      vec3 c0 = vec3(0.23, 0.30, 0.75);
+      vec3 c1 = vec3(0.86, 0.86, 0.90);
+      vec3 c2 = vec3(0.70, 0.01, 0.15);
+      if (t < 0.5) return mix(c0, c1, t / 0.5);
+      return mix(c1, c2, (t - 0.5) / 0.5);
+    }
+
+    vec3 colormapJet(float t) {
+      vec3 c0 = vec3(0.0, 0.0, 0.5);
+      vec3 c1 = vec3(0.0, 0.5, 1.0);
+      vec3 c2 = vec3(0.0, 1.0, 0.5);
+      vec3 c3 = vec3(1.0, 1.0, 0.0);
+      vec3 c4 = vec3(1.0, 0.0, 0.0);
+      if (t < 0.25) return mix(c0, c1, t / 0.25);
+      if (t < 0.50) return mix(c1, c2, (t - 0.25) / 0.25);
+      if (t < 0.75) return mix(c2, c3, (t - 0.50) / 0.25);
+      return mix(c3, c4, (t - 0.75) / 0.25);
+    }
+
+    vec3 colormapSST(float t) {
+      vec3 c0 = vec3(0.01, 0.15, 0.45);
+      vec3 c1 = vec3(0.0, 0.65, 0.95);
+      vec3 c2 = vec3(0.1, 0.88, 0.35);
+      vec3 c3 = vec3(1.0, 0.92, 0.05);
+      vec3 c4 = vec3(1.0, 0.42, 0.0);
+      vec3 c5 = vec3(0.95, 0.08, 0.05);
+      if (t < 0.20) return mix(c0, c1, t / 0.20);
+      if (t < 0.45) return mix(c1, c2, (t - 0.20) / 0.25);
+      if (t < 0.65) return mix(c2, c3, (t - 0.45) / 0.20);
+      if (t < 0.82) return mix(c3, c4, (t - 0.65) / 0.17);
+      return mix(c4, c5, (t - 0.82) / 0.18);
+    }
+
+    vec3 colormapSalinity(float t) {
+      vec3 c0 = vec3(0.02, 0.10, 0.28);
+      vec3 c1 = vec3(0.05, 0.35, 0.70);
+      vec3 c2 = vec3(0.12, 0.72, 0.95);
+      vec3 c3 = vec3(0.0, 1.0, 0.80);
+      if (t < 0.33) return mix(c0, c1, t / 0.33);
+      if (t < 0.66) return mix(c1, c2, (t - 0.33) / 0.33);
+      return mix(c2, c3, (t - 0.66) / 0.34);
+    }
+
+    vec3 colormapCurrents(float t) {
+      vec3 c0 = vec3(0.04, 0.08, 0.20);
+      vec3 c1 = vec3(0.02, 0.40, 0.75);
+      vec3 c2 = vec3(0.0, 0.95, 1.0);
+      vec3 c3 = vec3(1.0, 1.0, 1.0);
+      if (t < 0.4) return mix(c0, c1, t / 0.4);
+      if (t < 0.75) return mix(c1, c2, (t - 0.4) / 0.35);
+      return mix(c2, c3, (t - 0.75) / 0.25);
+    }
+
+    vec3 colormapWave(float t) {
+      vec3 c0 = vec3(0.15, 0.12, 0.45);
+      vec3 c1 = vec3(0.35, 0.25, 0.85);
+      vec3 c2 = vec3(0.70, 0.30, 0.90);
+      vec3 c3 = vec3(0.95, 0.25, 0.45);
+      if (t < 0.35) return mix(c0, c1, t / 0.35);
+      if (t < 0.70) return mix(c1, c2, (t - 0.35) / 0.35);
+      return mix(c2, c3, (t - 0.70) / 0.30);
+    }
+
+    vec3 colormapChlorophyll(float t) {
+      vec3 c0 = vec3(0.01, 0.16, 0.12);
+      vec3 c1 = vec3(0.04, 0.45, 0.32);
+      vec3 c2 = vec3(0.12, 0.82, 0.48);
+      vec3 c3 = vec3(0.75, 0.95, 0.22);
+      if (t < 0.33) return mix(c0, c1, t / 0.33);
+      if (t < 0.66) return mix(c1, c2, (t - 0.33) / 0.33);
+      return mix(c2, c3, (t - 0.66) / 0.34);
+    }
+
+    vec3 colormapOxygen(float t) {
+      vec3 c0 = vec3(0.35, 0.05, 0.40);
+      vec3 c1 = vec3(0.05, 0.55, 0.85);
+      vec3 c2 = vec3(0.30, 0.92, 0.98);
+      if (t < 0.5) return mix(c0, c1, t / 0.5);
+      return mix(c1, c2, (t - 0.5) / 0.5);
+    }
+
+    void main() {
+      vec2 p = vUv * 2.0 - 1.0;
+      float d = clamp(uLayerDepthRatio, 0.0, 1.0);
+
+      // Primary Warm Core Eddy
+      float distToWarmCore = length(p - vec2(0.28, -0.05));
+      float warmCore = exp(-distToWarmCore * 2.2);
+
+      // Secondary coastal eddy & upwelling pattern
+      float coastalCooling = smoothstep(-0.85, -0.2, p.x) * 0.28;
+
+      // Delta plume
+      float northPlume = smoothstep(0.2, 0.8, p.y) * exp(-abs(p.x - 0.1) * 2.5) * 0.2;
+
+      // Subtle volumetric layer internal wave perturbation
+      float layerWave = sin(p.x * 8.0 + uTime * 0.8) * 0.02 + cos(p.y * 7.0 - uTime * 0.6) * 0.015;
+      float effDepth = clamp(d + layerWave, 0.0, 1.0);
+
+      float val = 0.5;
+      if (uParamType == 0) {
+        // Temperature (SST / Subsurface): Warm upper layer, sharp thermocline drop, cold deep ocean
+        float surfaceTemp = 0.32 + warmCore * 0.68 + northPlume - coastalCooling;
+        float thermocline = exp(-effDepth * 5.2);
+        val = clamp(surfaceTemp * thermocline + (1.0 - thermocline) * 0.07, 0.0, 1.0);
+
+        if (uEnsoPhase == 1) {
+          float elNinoTongue = smoothstep(-0.6, 0.7, p.x) * exp(-p.y * p.y * 3.5);
+          val = clamp(val + (0.16 * uEnsoIntensity + elNinoTongue * 0.44 * uEnsoIntensity) * thermocline, 0.0, 1.0);
+        } else if (uEnsoPhase == 2) {
+          float laNinaTongue = smoothstep(-0.3, 0.8, p.x) * exp(-p.y * p.y * 3.5);
+          val = clamp(val - 0.32 * uEnsoIntensity * laNinaTongue * thermocline, 0.02, 1.0);
+        }
+      } else if (uParamType == 1) {
+        // Salinity: River runoff at surface, increasing salinity through the halocline
+        val = clamp(0.72 - northPlume * 2.2 * (1.0 - effDepth) + effDepth * 0.28 + (1.0 - distToWarmCore) * 0.12, 0.0, 1.0);
+      } else if (uParamType == 2) {
+        // Ocean Currents: Surface gyre decays into slower deep circulation
+        float gyreRot = sin(distToWarmCore * 14.0 - uTime * 2.5) * 0.3 + 0.6;
+        val = clamp((gyreRot + warmCore * 0.3) * exp(-effDepth * 3.8), 0.0, 1.0);
+      } else if (uParamType == 3) {
+        // Wave energy: Concentrated at the surface, decaying with depth
+        float surfWave = 0.75 - p.y * 0.45 + sin(p.x * 10.0 + uTime) * 0.12;
+        val = clamp(surfWave * exp(-effDepth * 7.5), 0.0, 1.0);
+      } else if (uParamType == 4) {
+        // Chlorophyll-a: Peaks in photic euphotic zone (SCM ~ 50-100m, d ~ 0.04 - 0.08)
+        float scm = exp(-pow((effDepth - 0.06) * 15.0, 2.0));
+        val = clamp((northPlume * 2.6 + 0.38) * scm, 0.0, 1.0);
+      } else {
+        // Dissolved Oxygen: Surface saturation, oxygen minimum zone (OMZ) at d ~ 0.16, slight deep recovery
+        float omz = 1.0 - exp(-pow((effDepth - 0.16) * 7.5, 2.0)) * 0.72;
+        val = clamp(omz * 0.82 + effDepth * 0.15, 0.05, 0.95);
+      }
+
+      val = clamp(val, 0.0, 1.0);
+
+      float mappedVal = val;
+      if (uLogScale == 1) {
+        mappedVal = log(1.0 + 9.0 * val) / 2.302585;
+      }
+
+      vec3 color;
+      if (uPalette == 1) color = colormapTurbo(mappedVal);
+      else if (uPalette == 2) color = colormapViridis(mappedVal);
+      else if (uPalette == 3) color = colormapThermal(mappedVal);
+      else if (uPalette == 4) color = colormapCoolwarm(mappedVal);
+      else if (uPalette == 5) color = colormapJet(mappedVal);
+      else {
+        if (uParamType == 0) color = colormapSST(mappedVal);
+        else if (uParamType == 1) color = colormapSalinity(mappedVal);
+        else if (uParamType == 2) color = colormapCurrents(mappedVal);
+        else if (uParamType == 3) color = colormapWave(mappedVal);
+        else if (uParamType == 4) color = colormapChlorophyll(mappedVal);
+        else color = colormapOxygen(mappedVal);
+      }
+
+      // Smooth horizontal edge fade to avoid hard intersection seams against walls
+      float edgeDist = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+      float edgeFade = smoothstep(0.0, 0.04, edgeDist);
+
+      // Volumetric opacity falls off gently with depth
+      float layerAlpha = mix(0.40, 0.16, d);
+      float alpha = layerAlpha * edgeFade * uOpacity;
+
+      gl_FragColor = vec4(color, alpha);
     }
   `
 };

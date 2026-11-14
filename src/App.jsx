@@ -67,6 +67,7 @@ export default function App() {
   const [layerOpacity, setLayerOpacity] = useState(0.95);
   const [verticalExaggeration, setVerticalExaggeration] = useState(1.0);
   const [isLogScale, setIsLogScale] = useState(false);
+  const [isoLevel, setIsoLevel] = useState(0.5);
   const [customRanges, setCustomRanges] = useState({});
 
   // Dynamic ENSO (El Niño / La Niña / Normal) Simulation State
@@ -493,6 +494,7 @@ export default function App() {
               selectedParam={selectedParam}
               depth={depth}
               viewMode={viewMode}
+              isoLevel={isoLevel}
               activeRegion={activeRegion}
               isStormLayerActive={isStormLayerActive}
               onSelectBuoy={(buoy) => setSelectedBuoy(buoy)}
@@ -627,6 +629,7 @@ export default function App() {
               selectedParam={selectedParam}
               depth={depth}
               viewMode={viewMode}
+              isoLevel={isoLevel}
               activeRegion={activeRegion}
               isStormLayerActive={isStormLayerActive}
               onSelectBuoy={(buoy) => setSelectedBuoy(buoy)}
@@ -645,6 +648,8 @@ export default function App() {
               selectedParam={selectedParam}
               viewMode={viewMode}
               setViewMode={setViewMode}
+              isoLevel={isoLevel}
+              setIsoLevel={setIsoLevel}
               onResetCamera={() => {}}
               onToggleGlobe={() => setActiveTab('Map View')}
               onOpenLocationModal={() => setIsLocationModalOpen(true)}
@@ -701,6 +706,8 @@ export default function App() {
         onClose={() => setIsControlsDrawerOpen(false)}
         viewMode={viewMode}
         setViewMode={setViewMode}
+        isoLevel={isoLevel}
+        setIsoLevel={setIsoLevel}
         depth={depth}
         setDepth={setDepth}
         selectedParam={selectedParam}

@@ -58,7 +58,9 @@ export default function AdvancedControlsDrawer({
   onOpenDepthPressure,
   onOpenNetcdfIngestion,
   onOpenAnalyticReport,
-  onOpenLocationModal
+  onOpenLocationModal,
+  isoLevel = 0.5,
+  setIsoLevel
 }) {
   const { t } = useTranslation();
   const [inputLat, setInputLat] = useState(activeRegion?.lat?.toString() || '15.297');
@@ -170,6 +172,29 @@ export default function AdvancedControlsDrawer({
                 );
               })}
             </div>
+
+            {/* Isosurface Extraction Threshold Slider */}
+            {viewMode === 'isosurface' && (
+              <div className="mt-2.5 p-3 rounded-xl bg-[#142D3A]/60 border border-[#0C969C]/30 space-y-1.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-xs font-semibold text-[#CCD0CF]">
+                  <span className="flex items-center gap-1.5">
+                    <Maximize2 className="w-3.5 h-3.5 text-[#00FFC8]" />
+                    <span>{t('viewModes.isoLevel', 'Isosurface Threshold')}</span>
+                  </span>
+                  <span className="font-mono text-[#00FFC8]">{Math.round((isoLevel ?? 0.5) * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.05"
+                  max="0.95"
+                  step="0.01"
+                  value={isoLevel ?? 0.5}
+                  onChange={(e) => setIsoLevel && setIsoLevel(parseFloat(e.target.value))}
+                  aria-label="Isosurface Extraction Threshold Level"
+                  className="w-full h-1.5 bg-[#0D202B] rounded-lg appearance-none cursor-pointer accent-[#0C969C]"
+                />
+              </div>
+            )}
           </section>
 
           {/* SECTION 2: Shaders, Palettes & 3D Optics */}

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } f
 import * as THREE from 'three';
 import { Camera, Check } from 'lucide-react';
 import { generateEarthTopographyTexture, generateBathymetryTexture } from './proceduralTextures';
-import { OceanSurfaceShader, DepthWallShader } from './OceanShaders';
+import { OceanSurfaceShader, DepthWallShader, VolumeLayerShader } from './OceanShaders';
 
 // ---------------------------------------------------------------------------
 // VECTOR FIELD HELPERS
@@ -420,6 +420,81 @@ function createTornadoFunnelMesh(radiusTop = 0.16, radiusBottom = 0.03, height =
   return group;
 }
 
+// ---------------------------------------------------------------------------
+// 3D ISOSURFACE SHELL EXTRACTION HELPERS
+// ---------------------------------------------------------------------------
+function updateIsoSheetVertices(geo, threshold, oceanWidth = 3.6, oceanDepth = 3.2, depthSliceHeight = 2.4) {
+  const pos = geo.attributes.position;
+  const baseDepth = (1.0 - threshold) * depthSliceHeight * 0.85 + 0.12;
+
+  for (let i = 0; i < pos.count; i++) {
+    const vx = pos.getX(i);
+    const vz = pos.getZ(i);
+    const px = vx / (oceanWidth * 0.5);
+    const pz = vz / (oceanDepth * 0.5);
+
+    const distToWarmCore = Math.hypot(px - 0.28, pz - (-0.05));
+    const warmCore = Math.exp(-distToWarmCore * 2.2);
+    const coastalShoal = Math.max(0, (-0.2 - px) / 0.65) * 0.22;
+    const waves = Math.sin(px * 4.5 + pz * 3.0) * 0.05 + Math.cos(px * 2.5 - pz * 5.0) * 0.04;
+
+    const finalY = -(baseDepth + warmCore * 0.32 - coastalShoal + waves);
+    pos.setY(i, finalY);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+}
+
+function buildIsoSurfaces(currentPalette, activeIsoLevel = 0.5, oceanWidth = 3.6, oceanDepth = 3.2, depthSliceHeight = 2.4) {
+  const thresholds = [0.35, activeIsoLevel, 0.65];
+  const sheets = [];
+
+  thresholds.forEach((thresh, idx) => {
+    const isMain = idx === 1;
+    const geo = new THREE.PlaneGeometry(oceanWidth * 0.94, oceanDepth * 0.94, 40, 40);
+    geo.rotateX(-Math.PI * 0.5);
+    updateIsoSheetVertices(geo, thresh, oceanWidth, oceanDepth, depthSliceHeight);
+
+    const color = speedToColor(thresh, currentPalette);
+    const mat = new THREE.MeshStandardMaterial({
+      color: color,
+      roughness: 0.3,
+      metalness: 0.15,
+      transparent: true,
+      opacity: isMain ? 0.58 : 0.40,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(0, 0, 0.15);
+    mesh.renderOrder = isMain ? 15 : 12;
+
+    const wireGeo = geo.clone();
+    const wireMat = new THREE.MeshBasicMaterial({
+      color: isMain ? 0xffffff : color,
+      wireframe: true,
+      transparent: true,
+      opacity: isMain ? 0.32 : 0.16,
+      depthWrite: false
+    });
+    const wireMesh = new THREE.Mesh(wireGeo, wireMat);
+    wireMesh.position.set(0, 0, 0.15);
+    wireMesh.renderOrder = mesh.renderOrder + 1;
+
+    sheets.push({
+      threshold: thresh,
+      geo,
+      mat,
+      mesh,
+      wireGeo,
+      wireMat,
+      wireMesh
+    });
+  });
+
+  return sheets;
+}
+
 const OceanCanvas = forwardRef(function OceanCanvas({
   selectedParam = 'sst',
   depth = 50,
@@ -436,7 +511,8 @@ const OceanCanvas = forwardRef(function OceanCanvas({
   verticalExaggeration = 1.0,
   isLogScale = false,
   showExportButton = true,
-  onExportPng
+  onExportPng,
+  isoLevel = 0.5
 }, ref) {
   const [isExported, setIsExported] = useState(false);
   const containerRef = useRef(null);
@@ -447,7 +523,11 @@ const OceanCanvas = forwardRef(function OceanCanvas({
   const depthWallUniformsRef = useRef({});
   const depthCutawayGroupRef = useRef(null);
   const volumeGroupRef = useRef(null);
+  const volumeUniformsRef = useRef({});
+  const volumeLayersRef = useRef(null);
   const isoGroupRef = useRef(null);
+  const isoMeshesRef = useRef(null);
+  const isoLevelRef = useRef(isoLevel);
   const vectorGroupRef = useRef(null);
   const vectorArrowsRef = useRef(null); // { mesh, geometry, material } for the current arrow InstancedMesh
   const paletteRef = useRef(palette);   // kept in sync below so render-loop & activeRegion effect see current palette
@@ -621,7 +701,8 @@ const OceanCanvas = forwardRef(function OceanCanvas({
       uEnsoIntensity: { value: 0.75 },
       uPalette: { value: 1 },
       uOpacity: { value: 0.95 },
-      uLogScale: { value: 0 }
+      uLogScale: { value: 0 },
+      uIsoLevel: { value: isoLevel }
     };
     uniformsRef.current = oceanUniforms;
 
@@ -765,18 +846,84 @@ const OceanCanvas = forwardRef(function OceanCanvas({
     depthCutawayGroup.add(seabedMesh);
 
     // ---------------------------------------------------------------------------
-    // PLACEHOLDER GROUPS for future Volume, Isosurface, and Vector Field modes
-    // These are empty now; later steps will populate them when their modes are active.
+    // 3D VOLUMETRIC MESH LAYERS
+    // Stacked semi-transparent horizontal planes spaced down through cutaway depth
     // ---------------------------------------------------------------------------
     const volumeGroup = new THREE.Group();
     volumeGroup.visible = false;
     scene.add(volumeGroup);
     volumeGroupRef.current = volumeGroup;
 
+    const initialParamIndices = { sst: 0, salinity: 1, currents: 2, wave: 3, chlorophyll: 4, oxygen: 5 };
+    const initialPaletteMap = { default: 0, turbo: 1, viridis: 2, thermal: 3, coolwarm: 4, jet: 5 };
+
+    const volumeUniforms = {
+      uTime: { value: 0 },
+      uParamType: { value: initialParamIndices[selectedParam] ?? 0 },
+      uPalette: { value: initialPaletteMap[palette] ?? 1 },
+      uOpacity: { value: layerOpacity },
+      uLogScale: { value: isLogScale ? 1 : 0 },
+      uEnsoPhase: { value: 1 },
+      uEnsoIntensity: { value: 0.75 }
+    };
+    volumeUniformsRef.current = volumeUniforms;
+    volumeGroup.scale.y = verticalExaggeration;
+
+    const numVolumeLayers = 10;
+    const volumeSharedGeo = new THREE.PlaneGeometry(oceanWidth, oceanDepth, 32, 32);
+    volumeSharedGeo.rotateX(-Math.PI * 0.5);
+
+    const volumeMaterials = [];
+    for (let i = 0; i < numVolumeLayers; i++) {
+      const depthRatio = (i + 0.6) / (numVolumeLayers + 0.5);
+      const layerY = -depthRatio * depthSliceHeight;
+
+      const layerUniforms = {
+        uTime: volumeUniforms.uTime,
+        uParamType: volumeUniforms.uParamType,
+        uPalette: volumeUniforms.uPalette,
+        uOpacity: volumeUniforms.uOpacity,
+        uLogScale: volumeUniforms.uLogScale,
+        uEnsoPhase: volumeUniforms.uEnsoPhase,
+        uEnsoIntensity: volumeUniforms.uEnsoIntensity,
+        uLayerDepthRatio: { value: depthRatio }
+      };
+
+      const layerMat = new THREE.ShaderMaterial({
+        uniforms: layerUniforms,
+        vertexShader: VolumeLayerShader.vertexShader,
+        fragmentShader: VolumeLayerShader.fragmentShader,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+      volumeMaterials.push(layerMat);
+
+      const layerMesh = new THREE.Mesh(volumeSharedGeo, layerMat);
+      layerMesh.position.set(0, layerY, 0.15);
+      // Deepest drawn first, shallowest drawn last for optimal back-to-front transparency
+      layerMesh.renderOrder = (numVolumeLayers - 1) - i;
+      volumeGroup.add(layerMesh);
+    }
+
+    volumeLayersRef.current = {
+      geometry: volumeSharedGeo,
+      materials: volumeMaterials
+    };
+
     const isoGroup = new THREE.Group();
     isoGroup.visible = false;
     scene.add(isoGroup);
     isoGroupRef.current = isoGroup;
+    isoGroup.scale.y = verticalExaggeration;
+
+    // Build initial 3D isosurface sheets inside cutaway block
+    const isoSheets = buildIsoSurfaces(paletteRef.current, isoLevel, oceanWidth, oceanDepth, depthSliceHeight);
+    isoSheets.forEach((s) => {
+      isoGroup.add(s.mesh);
+      isoGroup.add(s.wireMesh);
+    });
+    isoMeshesRef.current = isoSheets;
 
     const vectorGroup = new THREE.Group();
     vectorGroup.visible = false;
@@ -990,6 +1137,7 @@ const OceanCanvas = forwardRef(function OceanCanvas({
 
       if (uniformsRef.current.uTime) uniformsRef.current.uTime.value = elapsed;
       if (depthWallUniformsRef.current.uTime) depthWallUniformsRef.current.uTime.value = elapsed;
+      if (volumeUniformsRef.current.uTime) volumeUniformsRef.current.uTime.value = elapsed;
 
       // Real-time ENSO Phase & Intensity Uniform Updates
       const ensoPhaseVal = currentProps.ensoState?.phase === 'elnino' ? 1 : currentProps.ensoState?.phase === 'lanina' ? 2 : 0;
@@ -998,6 +1146,8 @@ const OceanCanvas = forwardRef(function OceanCanvas({
       if (uniformsRef.current.uEnsoIntensity) uniformsRef.current.uEnsoIntensity.value = ensoIntensityVal;
       if (depthWallUniformsRef.current.uEnsoPhase) depthWallUniformsRef.current.uEnsoPhase.value = ensoPhaseVal;
       if (depthWallUniformsRef.current.uEnsoIntensity) depthWallUniformsRef.current.uEnsoIntensity.value = ensoIntensityVal;
+      if (volumeUniformsRef.current.uEnsoPhase) volumeUniformsRef.current.uEnsoPhase.value = ensoPhaseVal;
+      if (volumeUniformsRef.current.uEnsoIntensity) volumeUniformsRef.current.uEnsoIntensity.value = ensoIntensityVal;
 
       // Animate 3D Storm, Hurricane & Tornado Funnels
       if (stormGroupRef.current) {
@@ -1151,8 +1301,23 @@ const OceanCanvas = forwardRef(function OceanCanvas({
       dom.removeEventListener('click', onClick);
       window.removeEventListener('resize', handleResize);
       renderer.dispose();
-      // Clear placeholder groups so their contents (if any) are released
+      // Dispose volume layer resources explicitly
+      if (volumeLayersRef.current) {
+        volumeLayersRef.current.geometry?.dispose();
+        volumeLayersRef.current.materials?.forEach((m) => m.dispose());
+        volumeLayersRef.current = null;
+      }
       if (volumeGroupRef.current) { volumeGroupRef.current.clear(); }
+      // Dispose isosurface shell resources explicitly
+      if (isoMeshesRef.current) {
+        isoMeshesRef.current.forEach(({ geo, mat, wireGeo, wireMat }) => {
+          geo?.dispose();
+          mat?.dispose();
+          wireGeo?.dispose();
+          wireMat?.dispose();
+        });
+        isoMeshesRef.current = null;
+      }
       if (isoGroupRef.current)    { isoGroupRef.current.clear(); }
       if (vectorGroupRef.current) { vectorGroupRef.current.clear(); }
       // Dispose vector arrow resources explicitly
@@ -1220,6 +1385,7 @@ const OceanCanvas = forwardRef(function OceanCanvas({
 
     if (uniformsRef.current.uParamType) uniformsRef.current.uParamType.value = pIdx;
     if (depthWallUniformsRef.current.uParamType) depthWallUniformsRef.current.uParamType.value = pIdx;
+    if (volumeUniformsRef.current.uParamType) volumeUniformsRef.current.uParamType.value = pIdx;
     if (uniformsRef.current.uDepth) uniformsRef.current.uDepth.value = depth;
 
     const modeIndices = { surface: 0, depth_slice: 1, volume: 2, volume_render: 2, isosurface: 3, iso_surface: 3, vector_field: 4 };
@@ -1255,17 +1421,53 @@ const OceanCanvas = forwardRef(function OceanCanvas({
 
     if (uniformsRef.current.uPalette) uniformsRef.current.uPalette.value = palVal;
     if (depthWallUniformsRef.current.uPalette) depthWallUniformsRef.current.uPalette.value = palVal;
+    if (volumeUniformsRef.current.uPalette) volumeUniformsRef.current.uPalette.value = palVal;
 
     if (uniformsRef.current.uOpacity) uniformsRef.current.uOpacity.value = layerOpacity;
     if (depthWallUniformsRef.current.uOpacity) depthWallUniformsRef.current.uOpacity.value = layerOpacity;
+    if (volumeUniformsRef.current.uOpacity) volumeUniformsRef.current.uOpacity.value = layerOpacity;
 
     if (uniformsRef.current.uLogScale) uniformsRef.current.uLogScale.value = isLogScale ? 1 : 0;
     if (depthWallUniformsRef.current.uLogScale) depthWallUniformsRef.current.uLogScale.value = isLogScale ? 1 : 0;
+    if (volumeUniformsRef.current.uLogScale) volumeUniformsRef.current.uLogScale.value = isLogScale ? 1 : 0;
 
     if (depthCutawayGroupRef.current) {
       depthCutawayGroupRef.current.scale.y = verticalExaggeration;
     }
+    if (volumeGroupRef.current) {
+      volumeGroupRef.current.scale.y = verticalExaggeration;
+    }
+    if (isoGroupRef.current) {
+      isoGroupRef.current.scale.y = verticalExaggeration;
+    }
   }, [palette, layerOpacity, verticalExaggeration, isLogScale]);
+
+  // Synchronize Isosurface Extraction Threshold & Palette
+  useEffect(() => {
+    isoLevelRef.current = isoLevel;
+    if (uniformsRef.current.uIsoLevel) {
+      uniformsRef.current.uIsoLevel.value = isoLevel;
+    }
+    if (isoMeshesRef.current && isoMeshesRef.current.length === 3) {
+      const oceanWidth = 3.6;
+      const oceanDepth = 3.2;
+      const depthSliceHeight = 2.4;
+
+      // Update middle dynamic shell
+      const mid = isoMeshesRef.current[1];
+      mid.threshold = isoLevel;
+      updateIsoSheetVertices(mid.geo, isoLevel, oceanWidth, oceanDepth, depthSliceHeight);
+      updateIsoSheetVertices(mid.wireGeo, isoLevel, oceanWidth, oceanDepth, depthSliceHeight);
+      const midCol = speedToColor(isoLevel, palette);
+      mid.mat.color.copy(midCol);
+
+      // Update static shells' colors for current palette
+      isoMeshesRef.current[0].mat.color.copy(speedToColor(isoMeshesRef.current[0].threshold, palette));
+      isoMeshesRef.current[0].wireMat.color.copy(speedToColor(isoMeshesRef.current[0].threshold, palette));
+      isoMeshesRef.current[2].mat.color.copy(speedToColor(isoMeshesRef.current[2].threshold, palette));
+      isoMeshesRef.current[2].wireMat.color.copy(speedToColor(isoMeshesRef.current[2].threshold, palette));
+    }
+  }, [isoLevel, palette]);
 
   return (
     <div className="relative w-full h-full overflow-hidden select-none">
