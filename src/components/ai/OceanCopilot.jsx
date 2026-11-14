@@ -43,7 +43,8 @@ export default function OceanCopilot({
   externalPrompt,
   onClearExternalPrompt,
   isOpen: propIsOpen,
-  setIsOpen: propSetIsOpen
+  setIsOpen: propSetIsOpen,
+  isFocusMode = false
 }) {
   const { i18n } = useTranslation();
   const [localIsOpen, setLocalIsOpen] = useState(false);
@@ -234,6 +235,7 @@ export default function OceanCopilot({
         onClick={() => setIsOpen(true)}
         activeRegionName={activeRegion?.name}
         activeSst={activeRegion?.sst ? (Number(activeRegion.sst) || 29.8).toFixed(1) : '29.8'}
+        isFocusMode={isFocusMode}
       />
 
       {/* 2. Slide-Over / Docked Intelligence Panel */}

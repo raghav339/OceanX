@@ -30,6 +30,19 @@
     "oceanAlerts": "Oceanographic Threat Alerts",
     "liveActive": "2 ACTIVE"
   },
+  "workstation": {
+    "fullMode": "Full Workstation",
+    "focusMode": "Focus Mode",
+    "exitFocus": "Full Mode",
+    "focusModeDesc": "Focus Mode (F): Clean, distraction-free 3D ocean immersion",
+    "fullWorkstationDesc": "Full Workstation Mode: All side panels and scientific dashboards"
+  },
+  "shortcuts": {
+    "focusMode": "Toggle Full Workstation / Focus Mode",
+    "playPause": "Play / Pause timeline simulation",
+    "toggleHelp": "Toggle keyboard shortcut help overlay",
+    "closeModal": "Close active modal, drawer, or dialog"
+  },
   "controls": {
     "positionCoords": "Position / Coordinates",
     "changeBasin": "Change Basin",

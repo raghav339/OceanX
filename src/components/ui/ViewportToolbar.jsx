@@ -9,6 +9,8 @@ import {
   Box,
   Boxes,
   Maximize2,
+  Minimize2,
+  LayoutGrid,
   Compass,
   Zap,
   Sliders,
@@ -38,7 +40,10 @@ export default function ViewportToolbar({
   onGetShareUrl,
   onExportPng,
   isoLevel = 0.5,
-  setIsoLevel
+  setIsoLevel,
+  isFocusMode = false,
+  onToggleFocusMode,
+  onOpenControls
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -192,6 +197,16 @@ export default function ViewportToolbar({
           >
             <Layers className="w-4 h-4" />
           </button>
+          {onOpenControls && (
+            <button
+              onClick={onOpenControls}
+              title={t('controls.advancedControls', 'Open Ocean Controls & Parameters Drawer')}
+              aria-label="Open Ocean Controls Drawer"
+              className="p-2 rounded-lg text-[#8FA8B2] hover:text-[#CCD0CF] hover:bg-[#142D3A] transition-colors cursor-pointer"
+            >
+              <Sliders className="w-4 h-4 text-[#0C969C]" />
+            </button>
+          )}
           {/* Phase 1.5: Export 3D Canvas PNG */}
           <div className="relative">
             <button
@@ -236,12 +251,51 @@ export default function ViewportToolbar({
         </div>
       </div>
 
-      {/* 3. Top-Right Dynamic Colorbar Legend */}
-      <div className="absolute top-3.5 right-3.5 z-20">
+      {/* 3. Top-Right Focus Mode Toggle & Dynamic Colorbar Legend */}
+      <div className="absolute top-3.5 right-3.5 z-20 flex flex-col items-end gap-2 pointer-events-auto">
+        {/* Full Workstation / Focus Mode Segmented Toggle Pill */}
+        <div 
+          role="group"
+          aria-label="Workstation View Mode Toggle"
+          className="bg-[#0D202B]/95 backdrop-blur-md p-1 rounded-xl border border-[#193544] shadow-lg flex items-center gap-1 select-none"
+        >
+          <button
+            type="button"
+            onClick={() => onToggleFocusMode && onToggleFocusMode(false)}
+            aria-pressed={!isFocusMode}
+            title={t('workstation.fullWorkstationDesc', 'Full Workstation Mode: All side panels and scientific dashboards')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              !isFocusMode
+                ? 'bg-[#0C969C]/25 text-[#00FFC8] border border-[#0C969C]/60 shadow-[0_0_12px_rgba(0,255,200,0.2)]'
+                : 'text-[#8FA8B2] hover:text-[#CCD0CF] hover:bg-[#142D3A] border border-transparent'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5 text-[#00FFC8]" />
+            <span className="font-medium text-[11.5px]">{t('workstation.fullMode', 'Full Workstation')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onToggleFocusMode && onToggleFocusMode(true)}
+            aria-pressed={isFocusMode}
+            title={t('workstation.focusModeDesc', 'Focus Mode (F): Clean, distraction-free 3D ocean immersion')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              isFocusMode
+                ? 'bg-gradient-to-r from-[#0C969C]/30 via-[#00FFC8]/25 to-[#0C969C]/30 text-[#00FFC8] border border-[#00FFC8]/60 shadow-[0_0_16px_rgba(0,255,200,0.3)]'
+                : 'text-[#8FA8B2] hover:text-[#CCD0CF] hover:bg-[#142D3A] border border-transparent'
+            }`}
+          >
+            {isFocusMode ? <Minimize2 className="w-3.5 h-3.5 text-[#00FFC8]" /> : <Maximize2 className="w-3.5 h-3.5 text-[#00FFC8]" />}
+            <span className="font-medium text-[11.5px]">{t('workstation.focusMode', 'Focus Mode')}</span>
+            <kbd className="hidden sm:inline-block text-[9px] px-1 py-0.2 rounded bg-[#06141B] text-[#00FFC8]/90 font-mono border border-[#00FFC8]/30">F</kbd>
+          </button>
+        </div>
+
+        {/* Dynamic Colorbar Legend */}
         <div 
           onClick={onOpenColorbarSettings}
           title="Click to customize palette, bounds, log scale, or vertical depth exaggeration"
-          className="bg-[#0D202B] px-3.5 py-2 rounded-xl border border-[#193544] hover:border-[#214555] shadow-sm min-w-[240px] cursor-pointer transition-colors group"
+          className="bg-[#0D202B]/95 backdrop-blur-md px-3.5 py-2 rounded-xl border border-[#193544] hover:border-[#214555] shadow-sm min-w-[240px] cursor-pointer transition-colors group"
         >
           <div className="flex items-center justify-between text-xs font-semibold text-[#CCD0CF] mb-1.5">
             <div className="flex items-center gap-1.5">

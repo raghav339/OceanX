@@ -17,6 +17,7 @@ export default function KeyboardHelp({ isOpen, onClose }) {
       icon: Play,
       items: [
         { keys: ['Space'], desc: t('shortcuts.playPause', 'Play / Pause timeline simulation') },
+        { keys: ['F'], desc: t('shortcuts.focusMode', 'Toggle Full Workstation / Focus Mode') },
         { keys: ['?'], desc: t('shortcuts.toggleHelp', 'Toggle keyboard shortcut help overlay') },
         { keys: ['Esc'], desc: t('shortcuts.closeModal', 'Close active modal, drawer, or dialog') }
       ]

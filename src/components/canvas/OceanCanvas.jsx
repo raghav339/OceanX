@@ -1286,11 +1286,20 @@ const OceanCanvas = forwardRef(function OceanCanvas({
       if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
       const w = containerRef.current.clientWidth;
       const h = containerRef.current.clientHeight;
+      if (w === 0 || h === 0) return;
       cameraRef.current.aspect = w / h;
       cameraRef.current.updateProjectionMatrix();
       rendererRef.current.setSize(w, h);
     };
     window.addEventListener('resize', handleResize);
+
+    let resizeObserver = null;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        handleResize();
+      });
+      resizeObserver.observe(containerRef.current);
+    }
 
     return () => {
       cancelAnimationFrame(animationFrameId);
@@ -1300,6 +1309,9 @@ const OceanCanvas = forwardRef(function OceanCanvas({
       dom.removeEventListener('wheel', onWheel);
       dom.removeEventListener('click', onClick);
       window.removeEventListener('resize', handleResize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       renderer.dispose();
       // Dispose volume layer resources explicitly
       if (volumeLayersRef.current) {

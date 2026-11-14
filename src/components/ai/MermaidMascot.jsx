@@ -6,7 +6,8 @@ export default function MermaidMascot({
   onClick,
   isOpen,
   activeRegionName = 'Bay of Bengal',
-  activeSst = '29.85'
+  activeSst = '29.85',
+  isFocusMode = false
 }) {
   const { t } = useTranslation();
   const [showBubble, setShowBubble] = useState(true);
@@ -138,8 +139,8 @@ export default function MermaidMascot({
       }}
       className="flex flex-col items-end select-none pointer-events-auto"
     >
-      {/* 1. Speech Callout Bubble (Floating Above or Below based on screen position) */}
-      {showBubble && !isDragging && (
+      {/* 1. Speech Callout Bubble (Suppressed in Focus Mode to avoid obstruction) */}
+      {!isFocusMode && showBubble && !isDragging && (
         <div 
           className={`absolute ${position.y < 160 ? 'top-[calc(100%+8px)]' : 'bottom-[calc(100%+8px)]'} ${position.x < 220 ? 'left-0' : 'right-0'} z-50 animate-in fade-in duration-200 pointer-events-auto`}
           style={{ width: 'max-content', maxWidth: '240px' }}
@@ -201,8 +202,10 @@ export default function MermaidMascot({
         <span className="absolute -top-3 left-1 w-2 h-2 rounded-full bg-[#00E5FF]/60 animate-bounce delay-100 pointer-events-none"></span>
         <span className="absolute -top-5 right-2 w-1.5 h-1.5 rounded-full bg-[#38BDF8]/70 animate-bounce delay-300 pointer-events-none"></span>
 
-        {/* Mascot Frame */}
-        <div className="relative w-16 h-16 sm:w-18 sm:h-18 rounded-full p-1 bg-gradient-to-tr from-[#00E5FF] via-[#1687FF] to-[#8B5CF6] shadow-2xl border-2 border-[#00E5FF]/80 group-hover:scale-110 shadow-[0_0_20px_rgba(0,229,255,0.3)] transition-all duration-300 flex items-center justify-center overflow-hidden">
+        {/* Mascot Frame - compact in Focus Mode */}
+        <div className={`relative rounded-full p-1 bg-gradient-to-tr from-[#00E5FF] via-[#1687FF] to-[#8B5CF6] shadow-2xl border-2 border-[#00E5FF]/80 group-hover:scale-110 shadow-[0_0_20px_rgba(0,229,255,0.3)] transition-all duration-300 flex items-center justify-center overflow-hidden ${
+          isFocusMode ? 'w-11 h-11' : 'w-16 h-16 sm:w-18 sm:h-18'
+        }`}>
           {/* Animated SVG Mermaid Character */}
           <svg 
             viewBox="0 0 100 100" 

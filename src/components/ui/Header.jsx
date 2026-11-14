@@ -11,6 +11,7 @@ import {
   Database,
   Sliders,
   Maximize2,
+  Minimize2,
   Sparkles,
   Menu,
   X,
@@ -41,7 +42,9 @@ export default function Header({
   onOpenNetcdfIngestion,
   onOpenCopilot,
   onOpenControls,
-  onOpenKeyboardHelp
+  onOpenKeyboardHelp,
+  isFocusMode = false,
+  onToggleFocusMode
 }) {
   const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -88,7 +91,9 @@ export default function Header({
   };
 
   return (
-    <header className="h-16 px-3 sm:px-5 border-b border-[#193544] bg-[#0A1720]/95 backdrop-blur-md flex items-center justify-between z-30 select-none">
+    <header className={`px-3 sm:px-5 border-b bg-[#0A1720]/95 backdrop-blur-md flex items-center justify-between z-30 select-none transition-all duration-300 ${
+      isFocusMode && activeTab === '3D View' ? 'h-12 border-[#142D3A]' : 'h-16 border-[#193544]'
+    }`}>
       {/* 1. Brand & Logo */}
       <div 
         onClick={() => setActiveTab('Story View')}
@@ -357,6 +362,24 @@ export default function Header({
             </div>
           )}
         </div>
+
+        {/* Workstation Focus Mode Toggle in Header */}
+        {activeTab === '3D View' && (
+          <button
+            onClick={() => onToggleFocusMode && onToggleFocusMode(!isFocusMode)}
+            title={isFocusMode ? t('workstation.fullWorkstationDesc', 'Switch to Full Workstation (F)') : t('workstation.focusModeDesc', 'Switch to Focus Mode (F)')}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border ${
+              isFocusMode
+                ? 'bg-[#00FFC8]/15 text-[#00FFC8] border-[#00FFC8]/60 shadow-[0_0_12px_rgba(0,255,200,0.22)]'
+                : 'bg-[#142D3A] hover:bg-[#183746] text-[#8FA8B2] hover:text-[#CCD0CF] border-[#214555]'
+            }`}
+          >
+            {isFocusMode ? <Minimize2 className="w-3.5 h-3.5 text-[#00FFC8]" /> : <Maximize2 className="w-3.5 h-3.5 text-[#0C969C]" />}
+            <span className="hidden sm:inline text-[11px] font-medium">
+              {isFocusMode ? t('workstation.exitFocus', 'Full Mode') : t('workstation.focusMode', 'Focus Mode')}
+            </span>
+          </button>
+        )}
 
         {/* Quick App Views Menu (Dashboard, Map, El Niño, About) */}
         <div className="relative" ref={viewsRef}>

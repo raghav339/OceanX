@@ -83,6 +83,11 @@
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
 }
 
+/* Focus Mode Layout Transitions */
+.focus-mode-transition {
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Phase 1.1: Live Ticker & Parameter Strip Value Transition Highlight Flash */
 @keyframes telemetry-card-flash {
   0% {

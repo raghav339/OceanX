@@ -56,9 +56,23 @@ export default function App() {
   });
   const [selectedBuoy, setSelectedBuoy] = useState(null);
   const [copilotExternalPrompt, setCopilotExternalPrompt] = useState(null);
+  const [isFocusMode, setIsFocusMode] = usePersistedState('oceanx_pref_focus_mode', false, {
+    validator: (v) => typeof v === 'boolean'
+  });
+
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [isControlsDrawerOpen, setIsControlsDrawerOpen] = useState(false);
   const oceanCanvasRef = useRef(null);
+
+  const handleToggleFocusMode = useCallback((val) => {
+    setIsFocusMode((prev) => {
+      const next = typeof val === 'boolean' ? val : !prev;
+      if (next) {
+        setIsCopilotOpen(false);
+      }
+      return next;
+    });
+  }, [setIsFocusMode, setIsCopilotOpen]);
 
   // Dynamic Colorbar, Palette, Layer Opacity & 3D Vertical Exaggeration State
   const [palette, setPalette] = usePersistedState('oceanx_pref_palette', 'turbo', {
@@ -304,6 +318,15 @@ export default function App() {
         setActiveTab((prev) => (prev === 'Map View' ? '3D View' : 'Map View'));
         return;
       }
+
+      // 8. F: Toggle Full Workstation / Focus Mode (in 3D View)
+      if (e.key === 'f' || e.key === 'F') {
+        if (activeTab === '3D View') {
+          e.preventDefault();
+          handleToggleFocusMode();
+          return;
+        }
+      }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -312,7 +335,7 @@ export default function App() {
     isKeyboardHelpOpen, isAnomalyModalOpen, isFleetModalOpen, isLocationModalOpen,
     isDatePickerModalOpen, isStormNewsModalOpen, isAnalyticReportOpen, isDepthPressureOpen,
     isColorbarSettingsOpen, isNetcdfIngestionOpen, selectedBuoy, isControlsDrawerOpen,
-    isCopilotOpen, setSelectedParam, setDepth
+    isCopilotOpen, setSelectedParam, setDepth, activeTab, handleToggleFocusMode
   ]);
 
   // Real-time animation timeline ticker
@@ -482,6 +505,8 @@ export default function App() {
         onOpenCopilot={() => setIsCopilotOpen(true)}
         onOpenControls={() => setIsControlsDrawerOpen(true)}
         onOpenKeyboardHelp={() => setIsKeyboardHelpOpen(true)}
+        isFocusMode={isFocusMode && activeTab === '3D View'}
+        onToggleFocusMode={handleToggleFocusMode}
       />
 
       {/* 2. Main Central Workstation or Views */}
@@ -599,31 +624,47 @@ export default function App() {
         /* Classic Multi-Panel Workstation View (for power users) */
         <div className="relative flex-1 flex overflow-hidden">
           {/* Left Parameter, Location, Depth & Time Control Cockpit */}
-          <LeftControlPanel
-            selectedParam={selectedParam}
-            setSelectedParam={setSelectedParam}
-            depth={depth}
-            setDepth={setDepth}
-            timeHour={timeHour}
-            setTimeHour={setTimeHour}
-            isPlaying={isPlaying}
-            setIsPlaying={setIsPlaying}
-            simSpeed={simSpeed}
-            setSimSpeed={setSimSpeed}
-            activeRegion={activeRegion}
-            onOpenLocationModal={() => setIsLocationModalOpen(true)}
-            onCustomCoords={handleCustomCoords}
-            selectedDate={selectedDate}
-            onOpenDatePicker={() => setIsDatePickerModalOpen(true)}
-            onOpenStormNews={() => setIsStormNewsModalOpen(true)}
-            isStormLayerActive={isStormLayerActive}
-            setIsStormLayerActive={setIsStormLayerActive}
-            onOpenDepthPressure={() => setIsDepthPressureOpen(true)}
-            onAskCopilot={(prompt) => setCopilotExternalPrompt(prompt)}
-          />
+          <div
+            className={`focus-mode-transition overflow-hidden flex-shrink-0 flex flex-col ${
+              isFocusMode
+                ? 'w-0 opacity-0 -translate-x-6 pointer-events-none'
+                : 'w-72 opacity-100 translate-x-0'
+            }`}
+            style={{ willChange: 'width, transform, opacity' }}
+            aria-hidden={isFocusMode}
+          >
+            <LeftControlPanel
+              selectedParam={selectedParam}
+              setSelectedParam={setSelectedParam}
+              depth={depth}
+              setDepth={setDepth}
+              timeHour={timeHour}
+              setTimeHour={setTimeHour}
+              isPlaying={isPlaying}
+              setIsPlaying={setIsPlaying}
+              simSpeed={simSpeed}
+              setSimSpeed={setSimSpeed}
+              activeRegion={activeRegion}
+              onOpenLocationModal={() => setIsLocationModalOpen(true)}
+              onCustomCoords={handleCustomCoords}
+              selectedDate={selectedDate}
+              onOpenDatePicker={() => setIsDatePickerModalOpen(true)}
+              onOpenStormNews={() => setIsStormNewsModalOpen(true)}
+              isStormLayerActive={isStormLayerActive}
+              setIsStormLayerActive={setIsStormLayerActive}
+              onOpenDepthPressure={() => setIsDepthPressureOpen(true)}
+              onAskCopilot={(prompt) => setCopilotExternalPrompt(prompt)}
+            />
+          </div>
 
           {/* Center 3D Ocean Digital Twin Viewport */}
-          <main className="relative flex-1 h-full overflow-hidden bg-[#06141B] rounded-2xl my-1.5 mx-1 border border-[#193544] shadow-md">
+          <main
+            className={`relative flex-1 h-full overflow-hidden bg-[#06141B] focus-mode-transition ${
+              isFocusMode
+                ? 'rounded-none my-0 mx-0 border-0 shadow-none'
+                : 'rounded-2xl my-1.5 mx-1 border border-[#193544] shadow-md'
+            }`}
+          >
             <OceanCanvas
               ref={oceanCanvasRef}
               selectedParam={selectedParam}
@@ -650,6 +691,9 @@ export default function App() {
               setViewMode={setViewMode}
               isoLevel={isoLevel}
               setIsoLevel={setIsoLevel}
+              isFocusMode={isFocusMode}
+              onToggleFocusMode={handleToggleFocusMode}
+              onOpenControls={() => setIsControlsDrawerOpen(true)}
               onResetCamera={() => {}}
               onToggleGlobe={() => setActiveTab('Map View')}
               onOpenLocationModal={() => setIsLocationModalOpen(true)}
@@ -668,37 +712,58 @@ export default function App() {
           </main>
 
           {/* Right In-Situ & Model Validation, Storm & AI Anomaly Analytics */}
-          <RightAnalyticsPanel
-            onOpenAnomalyModal={() => setIsAnomalyModalOpen(true)}
-            onOpenFleetModal={() => setIsFleetModalOpen(true)}
-            activeRegion={activeRegion}
-            onOpenStormNews={() => setIsStormNewsModalOpen(true)}
-            onOpenAnalyticReport={() => setIsAnalyticReportOpen(true)}
-            onOpenDepthPressure={() => setIsDepthPressureOpen(true)}
-            depth={depth}
-            ensoState={ensoState}
-            onFocusPacific={() => setActiveTab('El Niño Simulation')}
-            onAskCopilot={(prompt) => setCopilotExternalPrompt(prompt)}
-          />
+          <div
+            className={`focus-mode-transition overflow-hidden flex-shrink-0 flex flex-col ${
+              isFocusMode
+                ? 'w-0 opacity-0 translate-x-6 pointer-events-none'
+                : 'w-80 opacity-100 translate-x-0'
+            }`}
+            style={{ willChange: 'width, transform, opacity' }}
+            aria-hidden={isFocusMode}
+          >
+            <RightAnalyticsPanel
+              onOpenAnomalyModal={() => setIsAnomalyModalOpen(true)}
+              onOpenFleetModal={() => setIsFleetModalOpen(true)}
+              activeRegion={activeRegion}
+              onOpenStormNews={() => setIsStormNewsModalOpen(true)}
+              onOpenAnalyticReport={() => setIsAnalyticReportOpen(true)}
+              onOpenDepthPressure={() => setIsDepthPressureOpen(true)}
+              depth={depth}
+              ensoState={ensoState}
+              onFocusPacific={() => setActiveTab('El Niño Simulation')}
+              onAskCopilot={(prompt) => setCopilotExternalPrompt(prompt)}
+            />
+          </div>
         </div>
       )}
 
       {/* 3. Bottom 6-Parameter Strip (rendered on 3D Workstation and Map View) */}
-      {(activeTab === '3D View' || activeTab === 'Map View') && (
-        <BottomParameterStrip
-          selectedParam={selectedParam}
-          setSelectedParam={setSelectedParam}
-          activeRegion={activeRegion}
-          depth={depth}
-          onNavigateToMap={() => setActiveTab('Map View')}
-          refreshInterval={refreshInterval}
-          onSelectRefreshInterval={handleSelectRefreshInterval}
-          refreshCountdown={refreshCountdown}
-          isRefreshing={isRefreshing}
-          lastRefreshedAt={lastRefreshedAt}
-          onManualRefresh={handleManualRefresh}
-        />
-      )}
+      <div
+        className={`focus-mode-transition overflow-hidden shrink-0 ${
+          isFocusMode && activeTab === '3D View'
+            ? 'max-h-0 opacity-0 pointer-events-none -translate-y-4'
+            : (activeTab === '3D View' || activeTab === 'Map View')
+              ? 'max-h-24 opacity-100 translate-y-0'
+              : 'max-h-0 opacity-0 pointer-events-none hidden'
+        }`}
+        aria-hidden={isFocusMode && activeTab === '3D View'}
+      >
+        {(activeTab === '3D View' || activeTab === 'Map View') && (
+          <BottomParameterStrip
+            selectedParam={selectedParam}
+            setSelectedParam={setSelectedParam}
+            activeRegion={activeRegion}
+            depth={depth}
+            onNavigateToMap={() => setActiveTab('Map View')}
+            refreshInterval={refreshInterval}
+            onSelectRefreshInterval={handleSelectRefreshInterval}
+            refreshCountdown={refreshCountdown}
+            isRefreshing={isRefreshing}
+            lastRefreshedAt={lastRefreshedAt}
+            onManualRefresh={handleManualRefresh}
+          />
+        )}
+      </div>
 
       {/* 4. Advanced Controls Slide-Over Drawer */}
       <AdvancedControlsDrawer
@@ -862,6 +927,7 @@ export default function App() {
         onClearExternalPrompt={() => setCopilotExternalPrompt(null)}
         isOpen={isCopilotOpen}
         setIsOpen={setIsCopilotOpen}
+        isFocusMode={isFocusMode && activeTab === '3D View'}
       />
     </div>
   );
